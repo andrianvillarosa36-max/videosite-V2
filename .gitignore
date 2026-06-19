@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 .DS_Store
 node_modules/
+data/users.json
+data/users_backup_before_hash.json
+data/access_log.txt
