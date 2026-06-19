@@ -27,6 +27,7 @@
           <button onclick="setGrid('4'); hideMenu();" class="grid-btn">4×5</button>
         </div>
       </div>
+      <a href="/top.html" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; text-decoration:none; border-bottom:1px solid #30363D; font-size:0.85rem;">🏆 Top Videos</a>
       <a href="/settings.html" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; text-decoration:none; font-size:0.85rem;">⚙️ Settings</a>
       <div onclick="logout()" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#ff6666; cursor:pointer; font-size:0.85rem;">🚪 Logout</div>
     </div>
@@ -112,24 +113,6 @@
     <button onclick="setCategory('Corn')" id="cat-Corn" class="grid-btn">Corn</button>
   </div>
 
-
-  <!-- TOP & LEAST RATED -->
-  <div id="ratedSection" style="padding:12px 12px 0;">
-
-    <!-- TOP RATED -->
-    <div style="margin-bottom:14px;">
-      <p style="font-size:0.88rem; font-weight:700; margin-bottom:8px;">🏆 Top Rated</p>
-      <div id="topRatedRow" style="display:flex; gap:8px; overflow-x:auto; scrollbar-width:none;"></div>
-    </div>
-
-    <!-- LEAST RATED -->
-    <div style="margin-bottom:14px;">
-      <p style="font-size:0.88rem; font-weight:700; margin-bottom:8px;">💔 Least Rated</p>
-      <div id="leastRatedRow" style="display:flex; gap:8px; overflow-x:auto; scrollbar-width:none;"></div>
-    </div>
-
-  </div>
-
   <div id="gridSection">
     <div class="video-grid grid-2" id="videoGrid"></div>
     <div id="paginationBar" style="display:flex; justify-content:center; align-items:center; gap:6px; padding:16px; flex-wrap:wrap;"></div>
@@ -186,8 +169,59 @@
       renderVideos();
     }
 
+    function renderPopularRows() {
+      const scored = allVideos.map(function(v) {
+        const id    = v.type === 'series' ? (v.filename || v.title) : (v.url || '');
+        const likes = allLikes.filter(function(l) { return l.videoUrl === id; });
+        const likeCount = likes.filter(function(l) { return l.action === 'like'; }).length;
+        const disCount  = likes.filter(function(l) { return l.action === 'dislike'; }).length;
+        const views     = v.views || 0;
+        const score     = (likeCount - disCount) + views;
+        return { v, score };
+      });
+
+      const mostPopular  = scored.slice().sort(function(a,b) { return b.score - a.score; }).slice(0, 5);
+      const leastPopular = scored.slice().sort(function(a,b) { return a.score - b.score; }).slice(0, 5);
+
+      function buildPopularCard(item) {
+        const thumbStyle = item.v.thumb
+          ? 'background-image:url(' + item.v.thumb + '); background-size:cover; background-position:center;'
+          : '';
+        const div = document.createElement('div');
+        div.style.cssText = 'flex-shrink:0; width:100px; cursor:pointer;';
+        div.innerHTML =
+          '<div style="width:100px; height:140px; border-radius:8px; background:#1C2333; overflow:hidden; position:relative; ' + thumbStyle + '">' +
+            '<div style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.75); color:#00D4FF; font-size:0.6rem; font-weight:700; padding:2px 5px; border-radius:4px;">🔥 ' + item.score + '</div>' +
+            '<div style="position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent,rgba(0,0,0,0.9)); padding:16px 5px 5px;">' +
+              '<div style="color:#fff; font-size:0.6rem; font-weight:600; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">' + item.v.title + '</div>' +
+            '</div>' +
+          '</div>';
+        div.addEventListener('click', function() {
+          if (item.v.type === 'series') openSeries(item.v);
+          else playVideo(item.v.url, item.v.title, item.v.category, item.v.tags);
+        });
+        return div;
+      }
+
+      const mostRow  = document.getElementById('mostPopularRow');
+      const leastRow2 = document.getElementById('leastPopularRow');
+      mostRow.innerHTML  = '';
+      leastRow2.innerHTML = '';
+
+      if (mostPopular.length === 0) {
+        mostRow.innerHTML = '<p style="color:#8B949E; font-size:0.78rem;">No data yet.</p>';
+      } else {
+        mostPopular.forEach(function(item) { mostRow.appendChild(buildPopularCard(item)); });
+      }
+
+      if (leastPopular.length === 0) {
+        leastRow2.innerHTML = '<p style="color:#8B949E; font-size:0.78rem;">No data yet.</p>';
+      } else {
+        leastPopular.forEach(function(item) { leastRow2.appendChild(buildPopularCard(item)); });
+      }
+    }
+
     function renderVideos() {
-      renderRatedRows();
       const grid = document.getElementById('videoGrid');
 
       const filtered = currentCategory === 'All' ? allVideos
@@ -393,6 +427,11 @@
       const videoEl = document.getElementById('videoPlayer');
       videoEl.src   = url;
       window._currentVideoUrl = url;
+      fetch('/api/addview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: url })
+      });
       document.getElementById('playerTitle').textContent = title;
 
       // Refresh likes data fresh for this video (guard against stale fetch)
@@ -435,7 +474,6 @@
       document.getElementById('playerSection').style.display = 'block';
       document.getElementById('gridSection').style.display  = 'none';
       document.getElementById('filterBar').style.display    = 'none';
-      document.getElementById('ratedSection').style.display = 'none';
 
       // Show tags
       const tagsBox = document.getElementById('playerTags');
@@ -499,6 +537,11 @@
       savedScrollY = window.scrollY;
       window.scrollTo(0, 0);
       window._currentSeriesId = v.filename || v.title;
+      fetch('/api/addview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: window._currentSeriesId })
+      });
       document.getElementById('gridSection').style.display   = 'none';
       document.getElementById('filterBar').style.display     = 'none';
       document.getElementById('seriesSection').style.display = 'block';
@@ -642,7 +685,6 @@
       document.getElementById('episodeSection').style.display = 'none';
       document.getElementById('gridSection').style.display    = 'block';
       document.getElementById('filterBar').style.display      = 'flex';
-      document.getElementById('ratedSection').style.display   = 'block';
       currentSeries  = null;
       currentEpIndex = 0;
       setTimeout(function() {

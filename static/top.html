@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Top Videos — VideoSite</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      width: auto;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+    }
+
+    .leaderboard {
+      padding: 12px;
+    }
+
+    .rank-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+
+    .rank-number {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1rem;
+      flex-shrink: 0;
+      color: #000;
+    }
+
+    .rank-1 { background: #FFD700; }
+    .rank-2 { background: #C0C0C0; }
+    .rank-3 { background: #CD7F32; }
+    .rank-other { background: var(--border); color: var(--text); }
+
+    .rank-thumb {
+      width: 56px;
+      height: 78px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--card), var(--bg));
+      flex-shrink: 0;
+    }
+
+    .rank-info { flex: 1; min-width: 0; }
+
+    .rank-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .rank-stat {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav>
+    <div class="logo">🏆 Top Videos</div>
+    <div class="nav-right">
+      <a href="/index.html" style="color:var(--accent); font-size:0.82rem; text-decoration:none;">❌ Return</a>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-toprated" onclick="setTab('toprated')">🏆 Top Rated</button>
+    <button class="tab-btn" id="tab-leastrated" onclick="setTab('leastrated')">💔 Least Rated</button>
+    <button class="tab-btn" id="tab-mostpopular" onclick="setTab('mostpopular')">🔥 Most Popular</button>
+    <button class="tab-btn" id="tab-leastpopular" onclick="setTab('leastpopular')">📉 Least Popular</button>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="leaderboard" id="leaderboard"></div>
+
+  <script>
+    // Apply saved theme on load
+    (function() {
+      const themes = {
+        dark:       { bg:'#0D1117', card:'#1C2333', text:'#ffffff', border:'#30363D', muted:'#8B949E', accent:'#00D4FF' },
+        light:      { bg:'#f0f2f5', card:'#ffffff', text:'#1a1a1a', border:'#dcdfe4', muted:'#6b7280', accent:'#0077ff' },
+        neonred:    { bg:'#0D0508', card:'#1f0a10', text:'#ffe5e8', border:'#3D1018', muted:'#a87c82', accent:'#FF1744' },
+        neonpink:   { bg:'#0D0510', card:'#1f0a1a', text:'#ffe5f5', border:'#3D1030', muted:'#a87c9c', accent:'#FF2D9E' },
+        neongreen:  { bg:'#050D08', card:'#0a1f12', text:'#e5ffe9', border:'#103D1E', muted:'#7ca889', accent:'#00FF66' },
+        neonviolet: { bg:'#0A050D', card:'#160a1f', text:'#f0e5ff', border:'#2A103D', muted:'#947ca8', accent:'#B026FF' }
+      };
+      const name = localStorage.getItem('theme') || 'dark';
+      const t = themes[name];
+      document.documentElement.style.setProperty('--bg',     t.bg);
+      document.documentElement.style.setProperty('--card',   t.card);
+      document.documentElement.style.setProperty('--text',   t.text);
+      document.documentElement.style.setProperty('--border', t.border);
+      document.documentElement.style.setProperty('--muted',  t.muted);
+      document.documentElement.style.setProperty('--accent', t.accent);
+      document.body.style.background = t.bg;
+      document.body.style.color      = t.text;
+    })();
+
+    const user = JSON.parse(sessionStorage.getItem('user') || 'null');
+    if (!user) window.location.href = '/login.html';
+
+    let allVideos  = [];
+    let allRatings = [];
+    let allLikes   = [];
+    let currentTab = 'toprated';
+
+    async function loadData() {
+      const vRes = await fetch('/api/videos');
+      allVideos  = await vRes.json();
+      const rRes = await fetch('/api/ratings');
+      allRatings = await rRes.json();
+      const lRes = await fetch('/api/likes');
+      allLikes   = await lRes.json();
+      renderTab();
+    }
+
+    function getId(v) {
+      return v.type === 'series' ? (v.filename || v.title) : (v.url || '');
+    }
+
+    function getAvgRating(id) {
+      const ratings = allRatings.filter(function(r) { return r.videoUrl === id; });
+      if (ratings.length === 0) return null;
+      return ratings.reduce(function(a,b) { return a + b.rating; }, 0) / ratings.length;
+    }
+
+    function getPopularScore(id, views) {
+      const likes = allLikes.filter(function(l) { return l.videoUrl === id; });
+      const likeCount = likes.filter(function(l) { return l.action === 'like'; }).length;
+      const disCount  = likes.filter(function(l) { return l.action === 'dislike'; }).length;
+      return (likeCount - disCount) + (views || 0);
+    }
+
+    function setTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.getElementById('tab-' + tab).classList.add('active');
+      renderTab();
+    }
+
+    function renderTab() {
+      const board = document.getElementById('leaderboard');
+      let ranked = [];
+
+      if (currentTab === 'toprated' || currentTab === 'leastrated') {
+        ranked = allVideos.map(function(v) {
+          const id  = getId(v);
+          const avg = getAvgRating(id);
+          return { v, value: avg, label: avg !== null ? '★ ' + avg.toFixed(1) + ' / 5' : null };
+        }).filter(function(item) { return item.value !== null; });
+
+        if (currentTab === 'toprated') {
+          ranked = ranked.filter(function(item) { return item.value >= 3; }).sort(function(a,b) { return b.value - a.value; });
+        } else {
+          ranked = ranked.filter(function(item) { return item.value <= 2; }).sort(function(a,b) { return a.value - b.value; });
+        }
+      } else {
+        ranked = allVideos.map(function(v) {
+          const id    = getId(v);
+          const score = getPopularScore(id, v.views);
+          return { v, value: score, label: '🔥 ' + score + ' pts · 👁️ ' + (v.views || 0) + ' views' };
+        });
+
+        if (currentTab === 'mostpopular') {
+          ranked = ranked.sort(function(a,b) { return b.value - a.value; });
+        } else {
+          ranked = ranked.sort(function(a,b) { return a.value - b.value; });
+        }
+      }
+
+      ranked = ranked.slice(0, 20);
+
+      if (ranked.length === 0) {
+        board.innerHTML = '<p style="color:var(--muted); text-align:center; padding:24px; font-size:0.85rem;">No data yet for this category.</p>';
+        return;
+      }
+
+      board.innerHTML = '';
+      ranked.forEach(function(item, idx) {
+        const rank = idx + 1;
+        const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+        const thumbStyle = item.v.thumb ? 'background-image:url(' + item.v.thumb + '); background-size:cover; background-position:center;' : '';
+
+        const row = document.createElement('div');
+        row.className = 'rank-row';
+        row.innerHTML =
+          '<div class="rank-number ' + rankClass + '">' + rank + '</div>' +
+          '<div class="rank-thumb" style="' + thumbStyle + '"></div>' +
+          '<div class="rank-info">' +
+            '<div class="rank-title">' + item.v.title + '</div>' +
+            '<div class="rank-stat">' + item.label + '</div>' +
+          '</div>';
+
+        row.addEventListener('click', function() {
+          sessionStorage.setItem('jumpToVideo', JSON.stringify(item.v));
+          window.location.href = '/index.html';
+        });
+
+        board.appendChild(row);
+      });
+    }
+
+    function logout() {
+      sessionStorage.removeItem('user');
+      window.location.href = '/login.html';
+    }
+
+    loadData();
+  </script>
+
+</body>
+</html>
