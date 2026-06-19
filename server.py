@@ -18,21 +18,6 @@ def save_json(filename, data):
     with open(os.path.join(DATA_DIR, filename), 'w') as f:
         json.dump(data, f, indent=2)
 
-def hash_password(password, salt=None):
-    import hashlib, secrets
-    if salt is None:
-        salt = secrets.token_hex(16)
-    pwd_hash = hashlib.sha256((salt + password).encode()).hexdigest()
-    return f'{salt}${pwd_hash}'
-
-def verify_password(password, stored):
-    import hashlib
-    if '$' not in stored:
-        # legacy plaintext fallback, shouldn't happen after migration
-        return password == stored
-    salt, pwd_hash = stored.split('$', 1)
-    return hashlib.sha256((salt + password).encode()).hexdigest() == pwd_hash
-
 def parse_multipart(rfile, content_type, content_length):
     boundary = content_type.split('boundary=')[1].encode()
     data = rfile.read(content_length)
@@ -141,12 +126,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         length = int(self.headers.get('Content-Length', 0))
 
         if path == '/api/login':
-            body     = json.loads(self.rfile.read(length))
-            username = body.get('username')
-            password = body.get('password', '')
-            users    = load_json('users.json')
-            matched  = next((u for u in users if u['username'] == username), None)
-            if matched and verify_password(password, matched['password']):
+            body    = json.loads(self.rfile.read(length))
+            users   = load_json('users.json')
+            matched = next((u for u in users
+                           if u['username'] == body.get('username')
+                           and u['password'] == body.get('password')), None)
+            if matched:
                 self.send_json({ 'success': True, 'role': matched['role'], 'username': matched['username'] })
             else:
                 self.send_json({ 'success': False, 'message': 'Wrong username or password' })
@@ -393,7 +378,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
             users.append({
                 'username': username,
-                'password': hash_password(password),
+                'password': password,
                 'role': 'viewer',
                 'avatar': '😀',
                 'bio': ''
