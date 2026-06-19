@@ -1,10 +1,11 @@
 [
   {
     "username": "admin",
-    "password": "admin123",
+    "password": "9c96bc1221a1d21d05a36bf67cba1961bdf3d59d1bacfb88cf75f393fe220d98",
     "role": "admin",
     "avatar": "\ud83d\udc51",
-    "bio": "Site admin"
+    "bio": "Site admin",
+    "salt": "15b21db6e8a5587fdf17c026fcac1e9e"
   },
   {
     "username": "viewer1",
