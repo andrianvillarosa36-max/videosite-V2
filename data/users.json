@@ -23,9 +23,10 @@
   },
   {
     "username": "Test account 1",
-    "password": "watch789",
+    "password": "8a8fc6371178f70deb6826d9bda85ae315ccaa4e36f056458ca81f2a303df591",
     "role": "viewer",
     "avatar": "\ud83d\udc3a",
-    "bio": "I'm a test subject"
+    "bio": "I'm a test subject",
+    "salt": "2601b45a35aa04b670a0054752f25048"
   }
 ]
