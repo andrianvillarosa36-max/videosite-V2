@@ -1,0 +1,30 @@
+[
+  {
+    "username": "admin",
+    "password": "admin123",
+    "role": "admin",
+    "avatar": "\ud83d\udc51",
+    "bio": "Site admin"
+  },
+  {
+    "username": "viewer1",
+    "password": "watch123",
+    "role": "viewer",
+    "avatar": "\ud83c\udfac",
+    "bio": "Movie lover"
+  },
+  {
+    "username": "viewer2",
+    "password": "watch456",
+    "role": "viewer",
+    "avatar": "\ud83d\ude00",
+    "bio": "\ud83c\udf1a\ud83c\udf1a\ud83c\udf1a"
+  },
+  {
+    "username": "Test account 1",
+    "password": "watch789",
+    "role": "viewer",
+    "avatar": "\ud83d\udc3a",
+    "bio": "I'm a test subject"
+  }
+]
