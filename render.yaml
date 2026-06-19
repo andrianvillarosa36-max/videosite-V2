@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: videosite
+    env: python
+    buildCommand: ""
+    startCommand: python server.py

@@ -1,170 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - AnimeCorn</title>
-  <style>
-    :root {
-      --bg: #0D1117;
-      --card: #1C2333;
-      --text: #ffffff;
-      --border: #30363D;
-      --accent: #00D4FF;
-    }
-    body {
-      margin: 0;
-      padding: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-    .login-container {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 30px;
-      width: 100%;
-      max-width: 320px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-      text-align: center;
-    }
-    h2 {
-      margin-top: 0;
-      margin-bottom: 20px;
-      color: var(--text);
-    }
-    input {
-      width: 100%;
-      box-sizing: border-box;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      outline: none;
-    }
-    input:focus {
-      border-color: var(--accent);
-    }
-    button {
-      width: 100%;
-      background: var(--accent);
-      color: #000;
-      border: none;
-      padding: 12px;
-      border-radius: 8px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-bottom: 10px;
-      font-size: 1rem;
-    }
-    button:hover {
-      opacity: 0.9;
-    }
-    .secondary-btn {
-      background: transparent;
-      color: var(--accent);
-      border: 1px solid var(--accent);
-    }
-    .error-msg {
-      color: #ff4444;
-      font-size: 0.85rem;
-      margin-bottom: 10px;
-      display: none;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — VideoSite</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
-<body>
+<body class="auth-page">
 
-  <div class="login-container">
-    <h2>🌽 AnimeCorn</h2>
-    <div id="errorMsg" class="error-msg"></div>
-    
-    <input type="text" id="username" placeholder="Username" required>
-    <input type="password" id="password" placeholder="Password" required>
-    
-    <button onclick="login()">Login</button>
-    <button class="secondary-btn" onclick="register()">Create Account</button>
+  <div class="auth-box">
+    <h1 class="logo">▶ VideoSite</h1>
+    <p class="auth-sub">Sign in to watch videos</p>
+
+    <div id="errorMsg" class="error-msg" style="display:none;"></div>
+
+    <div class="field">
+      <input type="text" id="username" placeholder="Username" />
+    </div>
+    <div class="field">
+      <input type="password" id="password" placeholder="Password" />
+    </div>
+
+    <button onclick="login()">Sign In</button>
   </div>
 
   <script>
-    // Simple helper to get/set users in local memory
-    function getUsers() {
-      return JSON.parse(localStorage.getItem('users') || '[]');
-    }
-    function setUsers(users) {
-      localStorage.setItem('users', JSON.stringify(users));
-    }
-    function showError(msg) {
-      const err = document.getElementById('errorMsg');
-      err.textContent = msg;
-      err.style.display = 'block';
-    }
-
-    function login() {
-      const u = document.getElementById('username').value.trim();
-      const p = document.getElementById('password').value.trim();
-      
-      if (!u || !p) {
-        showError("Please enter username and password.");
-        return;
-      }
-
-      const users = getUsers();
-      const foundUser = users.find(user => user.username === u && user.password === p);
-
-      if (foundUser) {
-        // Save session and redirect
-        sessionStorage.setItem('user', JSON.stringify(foundUser));
-        window.location.href = 'index.html'; // RELATIVE PATH FIX
-      } else {
-        showError("Invalid username or password.");
-      }
-    }
-
-    function register() {
-      const u = document.getElementById('username').value.trim();
-      const p = document.getElementById('password').value.trim();
-      
-      if (!u || !p) {
-        showError("Please enter username and password to register.");
-        return;
-      }
-
-      const users = getUsers();
-      const exists = users.find(user => user.username === u);
-
-      if (exists) {
-        showError("Username already exists. Please login.");
-      } else {
-        // Create new user with a default avatar
-        const newUser = {
-          username: u,
-          password: p,
-          avatar: "😀",
-          role: "user"
-        };
-        users.push(newUser);
-        setUsers(users);
-        
-        // Auto-login and redirect
-        sessionStorage.setItem('user', JSON.stringify(newUser));
-        window.location.href = 'index.html'; // RELATIVE PATH FIX
-      }
-    }
-
-    // If already logged in, skip this page entirely
+    // If already logged in go to home
     if (sessionStorage.getItem('user')) {
-      window.location.href = 'index.html';
+      window.location.href = '/index.html';
+    }
+
+    async function login() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const errorMsg = document.getElementById('errorMsg');
+
+      if (!username || !password) {
+        errorMsg.textContent = 'Please enter username and password.';
+        errorMsg.style.display = 'block';
+        return;
+      }
+
+      const res  = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        sessionStorage.setItem('user', JSON.stringify(data));
+        if (data.role === 'admin') {
+          window.location.href = '/admin.html';
+        } else {
+          window.location.href = '/index.html';
+        }
+      } else {
+        errorMsg.textContent = data.message;
+        errorMsg.style.display = 'block';
+      }
     }
   </script>
 
 </body>
 </html>
-

@@ -34,10 +34,7 @@
 
   <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
-    <div style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;">
-      <button class="back-btn" onclick="goBack()">← Back to videos</button>
-      <button id="orientationBtn" onclick="toggleOrientation()" style="background:#1C2333; border:1px solid #30363D; color:#00D4FF; border-radius:8px; padding:6px 12px; font-size:0.82rem; cursor:pointer; width:auto;">🔄 Change Orientation</button>
-    </div>
+    <button class="back-btn" onclick="goBack()">← Back to videos</button>
     <div class="player-wrap">
       <video id="videoPlayer" controls></video>
       <p class="player-title" id="playerTitle"></p>
@@ -93,7 +90,7 @@
       <p style="font-size:0.9rem; font-weight:700; margin-top:16px; margin-bottom:10px;">More like this</p>
       <div id="seriesMore" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;"></div>
     </div>
-  </div> 
+  </div>
 
   <!-- SEARCH BAR -->
   <div style="padding:10px 12px; border-bottom:1px solid #30363D;">
@@ -139,6 +136,7 @@
   </div>
 
   <script>
+    // Apply saved theme on load
     (function() {
       const themes = {
         dark:       { bg:'#0D1117', card:'#1C2333', text:'#ffffff', border:'#30363D', muted:'#8B949E', accent:'#00D4FF' },
@@ -390,33 +388,6 @@
       }
     }
 
-	
-    async function toggleOrientation() {
-      try {
-        // Check if the browser supports screen orientation matching controls
-        if (!document.fullscreenElement) {
-          // Requesting fullscreen on the player wrapper is required by mobile devices to lock orientation
-          const playerWrap = document.querySelector('.player-wrap');
-          await playerWrap.requestFullscreen();
-        }
-
-        const currentOrientation = window.screen.orientation.type;
-
-        if (currentOrientation.includes('portrait')) {
-          // Lock to landscape for comfortable full-screen watching
-          await window.screen.orientation.lock('landscape');
-          document.getElementById('orientationBtn').textContent = '📱 Lock Portrait';
-        } else {
-          // Lock back to portrait or unlock it
-          await window.screen.orientation.lock('portrait');
-          document.getElementById('orientationBtn').textContent = '📺 Lock Landscape';
-        }
-      } catch (err) {
-        console.log("Orientation lock not fully supported on this browser/device: ", err);
-        alert("To rotate, please enable your phone's auto-rotate setting!");
-      }
-    }
-
     async function playVideo(url, title, category, tags) {
       savedScrollY = window.scrollY;
       const videoEl = document.getElementById('videoPlayer');
@@ -424,9 +395,11 @@
       window._currentVideoUrl = url;
       document.getElementById('playerTitle').textContent = title;
 
-      // Refresh likes data fresh for this video
+      // Refresh likes data fresh for this video (guard against stale fetch)
       const lRes = await fetch('/api/likes');
-      allLikes   = await lRes.json();
+      const freshLikes = await lRes.json();
+      if (window._currentVideoUrl !== url) return; // a newer playVideo call has taken over
+      allLikes = freshLikes;
 
       // Resume from last position
       const prog = allProgress.find(function(p) { return p.videoUrl === url; });
@@ -598,12 +571,6 @@
       currentEpIndex = idx;
       const ep = currentSeries.episodes[idx];
       document.getElementById('likeBar').innerHTML = '';
-      
-      // Handle optional orientation settings
-      if (typeof applyVideoOrientation === "function") {
-        setTimeout(applyVideoOrientation, 50);
-      }
-      
       document.getElementById('seriesSection').style.display  = 'none';
       document.getElementById('playerSection').style.display  = 'block';
       document.getElementById('videoPlayer').src              = ep.url;
@@ -613,9 +580,9 @@
       const lRes = await fetch('/api/likes');
       allLikes   = await lRes.json();
 
-      // Clear old tags and inject current series tags dynamically
+      // === FIX: Clear old tags and inject current series tags dynamically ===
       const tagsBox = document.getElementById('playerTags');
-      tagsBox.innerHTML = ''; 
+      tagsBox.innerHTML = ''; // Wipes out whatever video tags were loaded before
 
       if (currentSeries.category) {
         tagsBox.innerHTML += '<span style="background:#00D4FF; color:#000; border-radius:4px; padding:3px 8px; font-size:0.75rem; font-weight:700;">' + currentSeries.category + '</span>';
@@ -625,8 +592,9 @@
           tagsBox.innerHTML += '<span style="background:#1C2333; color:#8B949E; border:1px solid #30363D; border-radius:4px; padding:3px 8px; font-size:0.75rem;">#' + t + '</span>';
         });
       }
+      // ======================================================================
 
-      // Show like/dislike for this episode
+      // Show like dislike for this episode
       const likeBar2    = document.getElementById('likeBar');
       const videoLikes2 = allLikes.filter(function(l) { return l.videoUrl === ep.url; });
       const likeCount2  = videoLikes2.filter(function(l) { return l.action === 'like'; }).length;
@@ -636,8 +604,8 @@
       likeBar2.innerHTML =
         '<button onclick="toggleLike(\'' + ep.url.replace(/'/g,"\\'") + '\',\'like\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike2 && myLike2.action === 'like' ? '#00D4FF' : '#1C2333') + '; border:1px solid ' + (myLike2 && myLike2.action === 'like' ? '#00D4FF' : '#30363D') + '; color:' + (myLike2 && myLike2.action === 'like' ? '#000' : '#fff') + '; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👍 ' + likeCount2 + '</button>' +
         '<button onclick="toggleLike(\'' + ep.url.replace(/'/g,"\\'") + '\',\'dislike\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike2 && myLike2.action === 'dislike' ? '#ff4444' : '#1C2333') + '; border:1px solid ' + (myLike2 && myLike2.action === 'dislike' ? '#ff4444' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👎 ' + disCount2 + '</button>';
-      
-      // Update inline lists below player
+
+      // Show episode list below player
       const epSection = document.getElementById('episodeSection');
       const epList    = document.getElementById('episodeList');
       epSection.style.display = 'block';
@@ -661,7 +629,6 @@
 
       videoEl.play();
       window.scrollTo(0, 0);
-      loadComments(ep.url, 'commentList');
     }
 
     function goBack() {
@@ -678,11 +645,6 @@
       document.getElementById('ratedSection').style.display   = 'block';
       currentSeries  = null;
       currentEpIndex = 0;
-
-      // Release orientation lock when exiting the player
-      if (window.screen.orientation && window.screen.orientation.unlock) {
-        window.screen.orientation.unlock();
-      }
       setTimeout(function() {
         window.scrollTo(0, savedScrollY);
       }, 10);
@@ -965,4 +927,3 @@
 
 </body>
 </html>
-
