@@ -81,6 +81,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(conv)
         elif path == '/users.html':
             self.serve_file(os.path.join(STATIC_DIR, 'users.html'), 'text/html')
+        elif path == '/top.html':
+            self.serve_file(os.path.join(STATIC_DIR, 'top.html'), 'text/html')
         elif path == '/settings.html':
             self.serve_file(os.path.join(STATIC_DIR, 'settings.html'), 'text/html')
         elif path == '/profile.html':
@@ -384,6 +386,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 'bio': ''
             })
             save_json('users.json', users)
+            self.send_json({ 'success': True })
+
+        elif path == '/api/addview':
+            body     = json.loads(self.rfile.read(length))
+            videoUrl = body.get('videoUrl')
+            videos   = load_json('videos.json')
+            for v in videos:
+                vid = v.get('filename') if v.get('type') == 'series' else v.get('url')
+                if vid == videoUrl:
+                    v['views'] = v.get('views', 0) + 1
+            save_json('videos.json', videos)
             self.send_json({ 'success': True })
 
         else:
