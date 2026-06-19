@@ -6,6 +6,19 @@ import shutil
 from datetime import datetime, timedelta
 online_users = {}
 
+import hashlib
+import secrets
+
+def hash_password(password, salt=None):
+    if salt is None:
+        salt = secrets.token_hex(16)
+    h = hashlib.sha256((salt + password).encode()).hexdigest()
+    return salt, h
+
+def verify_password(password, salt, stored_hash):
+    _, h = hash_password(password, salt)
+    return secrets.compare_digest(h, stored_hash)
+
 DATA_DIR   = 'data'
 VIDEO_DIR  = 'videos'
 STATIC_DIR = 'static'
@@ -128,15 +141,31 @@ class Handler(http.server.BaseHTTPRequestHandler):
         length = int(self.headers.get('Content-Length', 0))
 
         if path == '/api/login':
-            body    = json.loads(self.rfile.read(length))
-            users   = load_json('users.json')
-            matched = next((u for u in users
-                           if u['username'] == body.get('username')
-                           and u['password'] == body.get('password')), None)
-            if matched:
-                self.send_json({ 'success': True, 'role': matched['role'], 'username': matched['username'] })
-            else:
+            body     = json.loads(self.rfile.read(length))
+            username = body.get('username', '')
+            password = body.get('password', '')
+            users    = load_json('users.json')
+            matched  = next((u for u in users if u['username'] == username), None)
+
+            if not matched:
                 self.send_json({ 'success': False, 'message': 'Wrong username or password' })
+                return
+
+            # Migrate plaintext password to hashed on first successful login
+            if 'salt' not in matched:
+                if matched.get('password') != password:
+                    self.send_json({ 'success': False, 'message': 'Wrong username or password' })
+                    return
+                salt, hashed = hash_password(password)
+                matched['salt']     = salt
+                matched['password'] = hashed
+                save_json('users.json', users)
+            else:
+                if not verify_password(password, matched['salt'], matched['password']):
+                    self.send_json({ 'success': False, 'message': 'Wrong username or password' })
+                    return
+
+            self.send_json({ 'success': True, 'role': matched['role'], 'username': matched['username'] })
 
         elif path == '/api/addvideo':
             body     = json.loads(self.rfile.read(length))
@@ -378,9 +407,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({ 'success': False, 'message': 'Username already taken.' })
                 return
 
+            salt, hashed = hash_password(password)
             users.append({
                 'username': username,
-                'password': password,
+                'password': hashed,
+                'salt': salt,
                 'role': 'viewer',
                 'avatar': '😀',
                 'bio': ''
