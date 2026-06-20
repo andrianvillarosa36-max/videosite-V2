@@ -893,9 +893,18 @@
     function goBack() {
       document.getElementById('likeBar').innerHTML = '';
       if (window._progressTimer) clearInterval(window._progressTimer);
-      document.getElementById('videoPlayer').pause();
-      document.getElementById('videoPlayer').src    = '';
-      document.getElementById('videoPlayer').onended = null;
+      const videoEl = document.getElementById('videoPlayer');
+      videoEl.pause();
+      videoEl.onended = null;
+      videoEl.onplay  = null;
+      videoEl.onpause = null;
+      videoEl.src     = '';
+
+      // Manually reset custom player icon state since pausing right before
+      // clearing src can prevent the onpause event from firing reliably
+      document.getElementById('playPauseIcon').textContent = '▶️';
+      document.getElementById('centerPlayBtn').style.display = 'flex';
+      clearTimeout(controlsHideTimer);
       document.getElementById('playerSection').style.display  = 'none';
       document.getElementById('seriesSection').style.display  = 'none';
       document.getElementById('episodeSection').style.display = 'none';
