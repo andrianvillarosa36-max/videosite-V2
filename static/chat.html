@@ -518,14 +518,14 @@
 
     function openChat(username) {
       currentChat = username;
-      chatToken++;
+      const myToken = ++chatToken;
       document.getElementById('userListPage').style.display = 'none';
       document.getElementById('chatPage').style.display     = 'flex';
       document.getElementById('chatName').textContent       = username;
       document.getElementById('chatAvatar').textContent     = username.slice(0,2).toUpperCase();
-      loadMessages();
+      loadMessages(myToken);
       if (pollInterval) clearInterval(pollInterval);
-      pollInterval = setInterval(loadMessages, 3000);
+      pollInterval = setInterval(function() { loadMessages(chatToken); }, 3000);
     }
 
     function goBack() {
@@ -537,14 +537,15 @@
       loadUsers();
     }
 
-    async function loadMessages() {
-      const myToken    = chatToken;
+    async function loadMessages(myToken) {
+      if (myToken === undefined) myToken = chatToken;
       const targetChat = currentChat;
       const res  = await fetch('/api/messages?user1=' + user.username + '&user2=' + targetChat);
       const msgs = await res.json();
 
-      // If the user switched chats while this request was in flight, discard the result.
-      if (myToken !== chatToken || targetChat !== currentChat) return;
+      // Only the single most-recent request is allowed to render, regardless of
+      // network arrival order. Anything else is stale and discarded.
+      if (myToken !== chatToken) return;
 
       const box  = document.getElementById('messages');
       const wasAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
