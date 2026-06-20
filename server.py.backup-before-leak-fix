@@ -5,7 +5,6 @@ import hashlib
 import secrets
 
 from datetime import datetime, timedelta
-from contextlib import contextmanager
 
 import psycopg2
 import psycopg2.extras
@@ -41,16 +40,13 @@ def get_db():
 def put_db(conn):
     get_pool().putconn(conn)
 
+from contextlib import contextmanager
+
 @contextmanager
 def db_cursor():
-    """
-    Safe DB access: always returns the connection to the pool,
-    even if an exception happens. Commits on success, rolls back on error.
-    Usage: with db_cursor() as (conn, cur): ...
-    """
     conn = get_db()
-    cur = conn.cursor()
     try:
+        cur = conn.cursor()
         yield conn, cur
         conn.commit()
     except Exception:
@@ -59,7 +55,6 @@ def db_cursor():
     finally:
         cur.close()
         put_db(conn)
-
 
 # ---------- Auth helpers ----------
 
@@ -223,9 +218,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.serve_file(os.path.join(STATIC_DIR, 'signup.html'), 'text/html')
 
         elif path == '/api/videos':
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT * FROM videos ORDER BY id')
-                rows = cur.fetchall()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM videos ORDER BY id')
+            rows = cur.fetchall()
+            cur.close()
+            put_db(conn)
             self.send_json([video_row_to_json(v) for v in rows])
 
         elif path.startswith('/videos/'):
@@ -237,9 +235,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_error(404)
 
         elif path == '/api/users':
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT username, role, avatar, bio FROM users ORDER BY username')
-                rows = cur.fetchall()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT username, role, avatar, bio FROM users ORDER BY username')
+            rows = cur.fetchall()
+            cur.close()
+            put_db(conn)
             self.send_json([dict(r) for r in rows])
 
         elif path.startswith('/api/messages'):
@@ -247,20 +248,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
             qs = parse_qs(urlparse(self.path).query)
             user1 = qs.get('user1', [''])[0]
             user2 = qs.get('user2', [''])[0]
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    '''SELECT * FROM messages
-                       WHERE (sender = %s AND recipient = %s) OR (sender = %s AND recipient = %s)
-                       ORDER BY id''',
-                    (user1, user2, user2, user1)
-                )
-                rows = cur.fetchall()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                '''SELECT * FROM messages
+                   WHERE (sender = %s AND recipient = %s) OR (sender = %s AND recipient = %s)
+                   ORDER BY id''',
+                (user1, user2, user2, user1)
+            )
+            rows = cur.fetchall()
+            cur.close()
+            put_db(conn)
             self.send_json([message_row_to_json(m) for m in rows])
 
         elif path == '/api/ratings':
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT username, video_url AS "videoUrl", rating FROM ratings ORDER BY id')
-                rows = cur.fetchall()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT username, video_url AS "videoUrl", rating FROM ratings ORDER BY id')
+            rows = cur.fetchall()
+            cur.close()
+            put_db(conn)
             self.send_json([dict(r) for r in rows])
 
         elif path == '/api/online':
@@ -273,33 +280,45 @@ class Handler(http.server.BaseHTTPRequestHandler):
             from urllib.parse import urlparse, parse_qs
             qs = parse_qs(urlparse(self.path).query)
             username = qs.get('username', [''])[0]
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT * FROM progress WHERE username = %s ORDER BY id', (username,))
-                rows = cur.fetchall()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM progress WHERE username = %s ORDER BY id', (username,))
+            rows = cur.fetchall()
+            cur.close()
+            put_db(conn)
             self.send_json([progress_row_to_json(p) for p in rows])
 
         elif path == '/api/favorites':
             from urllib.parse import urlparse, parse_qs
             qs = parse_qs(urlparse(self.path).query)
             username = qs.get('username', [''])[0]
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT username, video_url AS "videoUrl" FROM favorites WHERE username = %s ORDER BY id', (username,))
-                rows = cur.fetchall()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT username, video_url AS "videoUrl" FROM favorites WHERE username = %s ORDER BY id', (username,))
+            rows = cur.fetchall()
+            cur.close()
+            put_db(conn)
             self.send_json([dict(r) for r in rows])
 
         elif path == '/api/likes':
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT username, video_url AS "videoUrl", action FROM likes ORDER BY id')
-                rows = cur.fetchall()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT username, video_url AS "videoUrl", action FROM likes ORDER BY id')
+            rows = cur.fetchall()
+            cur.close()
+            put_db(conn)
             self.send_json([dict(r) for r in rows])
 
         elif path.startswith('/api/comments'):
             from urllib.parse import urlparse, parse_qs
             qs = parse_qs(urlparse(self.path).query)
             videoUrl = qs.get('videoUrl', [''])[0]
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT * FROM comments WHERE video_url = %s ORDER BY id', (videoUrl,))
-                rows = cur.fetchall()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM comments WHERE video_url = %s ORDER BY id', (videoUrl,))
+            rows = cur.fetchall()
+            cur.close()
+            put_db(conn)
             self.send_json([comment_row_to_json(c) for c in rows])
 
         else:
@@ -329,27 +348,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
             username = body.get('username', '')
             password = body.get('password', '')
 
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT * FROM users WHERE username = %s', (username,))
-                matched = cur.fetchone()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM users WHERE username = %s', (username,))
+            matched = cur.fetchone()
 
-                if not matched:
+            if not matched:
+                cur.close(); put_db(conn)
+                self.send_json({'success': False, 'message': 'Wrong username or password'})
+                return
+
+            if not matched.get('salt'):
+                # legacy plaintext password, migrate on first login
+                if matched['password'] != password:
+                    cur.close(); put_db(conn)
+                    self.send_json({'success': False, 'message': 'Wrong username or password'})
+                    return
+                salt, hashed = hash_password(password)
+                cur.execute('UPDATE users SET password = %s, salt = %s WHERE username = %s',
+                            (hashed, salt, username))
+                conn.commit()
+            else:
+                if not verify_password(password, matched['salt'], matched['password']):
+                    cur.close(); put_db(conn)
                     self.send_json({'success': False, 'message': 'Wrong username or password'})
                     return
 
-                if not matched.get('salt'):
-                    # legacy plaintext password, migrate on first login
-                    if matched['password'] != password:
-                        self.send_json({'success': False, 'message': 'Wrong username or password'})
-                        return
-                    salt, hashed = hash_password(password)
-                    cur.execute('UPDATE users SET password = %s, salt = %s WHERE username = %s',
-                                (hashed, salt, username))
-                else:
-                    if not verify_password(password, matched['salt'], matched['password']):
-                        self.send_json({'success': False, 'message': 'Wrong username or password'})
-                        return
-
+            cur.close(); put_db(conn)
             token = create_session(matched['username'], matched['role'])
             self.send_json({'success': True, 'role': matched['role'], 'username': matched['username'], 'token': token})
 
@@ -362,27 +387,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
             category = body.get('category', '')
             vtype = body.get('type', 'video')
 
+            conn = get_db()
+            cur = conn.cursor()
             if vtype == 'series':
                 episodes = body.get('episodes', [])
-                with db_cursor() as (conn, cur):
-                    cur.execute(
-                        '''INSERT INTO videos (title, filename, thumb, category, type, episodes)
-                           VALUES (%s, %s, %s, %s, 'series', %s)''',
-                        (title, title, thumb, category, json.dumps(episodes))
-                    )
+                cur.execute(
+                    '''INSERT INTO videos (title, filename, thumb, category, type, episodes)
+                       VALUES (%s, %s, %s, %s, 'series', %s)''',
+                    (title, title, thumb, category, json.dumps(episodes))
+                )
+                conn.commit()
+                cur.close(); put_db(conn)
                 self.send_json({'success': True})
             else:
                 url = body.get('url', '')
                 if url:
                     filename = url.split('/')[-1]
-                    with db_cursor() as (conn, cur):
-                        cur.execute(
-                            '''INSERT INTO videos (title, filename, url, thumb, category, type)
-                               VALUES (%s, %s, %s, %s, %s, 'video')''',
-                            (title, filename, url, thumb, category)
-                        )
+                    cur.execute(
+                        '''INSERT INTO videos (title, filename, url, thumb, category, type)
+                           VALUES (%s, %s, %s, %s, %s, 'video')''',
+                        (title, filename, url, thumb, category)
+                    )
+                    conn.commit()
+                    cur.close(); put_db(conn)
                     self.send_json({'success': True})
                 else:
+                    cur.close(); put_db(conn)
                     self.send_json({'success': False, 'message': 'No URL provided'})
 
         elif path == '/api/delete':
@@ -391,8 +421,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             filename = body.get('filename', '')
 
-            with db_cursor() as (conn, cur):
-                cur.execute('DELETE FROM videos WHERE filename = %s', (filename,))
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('DELETE FROM videos WHERE filename = %s', (filename,))
+            conn.commit()
+            cur.close(); put_db(conn)
 
             filepath = safe_join(VIDEO_DIR, filename)
             if filepath and os.path.exists(filepath) and os.path.isfile(filepath):
@@ -404,13 +437,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if not session: return
             body = json.loads(self.rfile.read(length))
 
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    '''INSERT INTO messages (sender, recipient, content, type, time, read)
-                       VALUES (%s, %s, %s, %s, %s, FALSE)''',
-                    (session['username'], body.get('to'), body.get('content'),
-                     body.get('type', 'text'), datetime.now().strftime('%H:%M'))
-                )
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                '''INSERT INTO messages (sender, recipient, content, type, time, read)
+                   VALUES (%s, %s, %s, %s, %s, FALSE)''',
+                (session['username'], body.get('to'), body.get('content'),
+                 body.get('type', 'text'), datetime.now().strftime('%H:%M'))
+            )
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/deletemessage':
@@ -421,16 +457,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             user1 = session['username']
             user2 = body.get('user2')
 
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    '''SELECT id FROM messages
-                       WHERE (sender = %s AND recipient = %s) OR (sender = %s AND recipient = %s)
-                       ORDER BY id''',
-                    (user1, user2, user2, user1)
-                )
-                conv = cur.fetchall()
-                if index is not None and 0 <= index < len(conv):
-                    cur.execute('DELETE FROM messages WHERE id = %s', (conv[index]['id'],))
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                '''SELECT id FROM messages
+                   WHERE (sender = %s AND recipient = %s) OR (sender = %s AND recipient = %s)
+                   ORDER BY id''',
+                (user1, user2, user2, user1)
+            )
+            conv = cur.fetchall()
+            if index is not None and 0 <= index < len(conv):
+                cur.execute('DELETE FROM messages WHERE id = %s', (conv[index]['id'],))
+                conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/editmessage':
@@ -442,17 +481,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
             user1 = session['username']
             user2 = body.get('user2')
 
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    '''SELECT id FROM messages
-                       WHERE (sender = %s AND recipient = %s) OR (sender = %s AND recipient = %s)
-                       ORDER BY id''',
-                    (user1, user2, user2, user1)
-                )
-                conv = cur.fetchall()
-                if index is not None and 0 <= index < len(conv):
-                    cur.execute('UPDATE messages SET content = %s, edited = TRUE WHERE id = %s',
-                                (content, conv[index]['id']))
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                '''SELECT id FROM messages
+                   WHERE (sender = %s AND recipient = %s) OR (sender = %s AND recipient = %s)
+                   ORDER BY id''',
+                (user1, user2, user2, user1)
+            )
+            conv = cur.fetchall()
+            if index is not None and 0 <= index < len(conv):
+                cur.execute('UPDATE messages SET content = %s, edited = TRUE WHERE id = %s',
+                            (content, conv[index]['id']))
+                conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/markread':
@@ -460,11 +502,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if not session: return
             body = json.loads(self.rfile.read(length))
 
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    'UPDATE messages SET read = TRUE WHERE sender = %s AND recipient = %s',
-                    (body.get('from'), session['username'])
-                )
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                'UPDATE messages SET read = TRUE WHERE sender = %s AND recipient = %s',
+                (body.get('from'), session['username'])
+            )
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/updateprofile':
@@ -474,9 +519,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             avatar = body.get('avatar')
             bio = body.get('bio')
 
-            with db_cursor() as (conn, cur):
-                cur.execute('UPDATE users SET avatar = %s, bio = %s WHERE username = %s',
-                            (avatar, bio, session['username']))
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('UPDATE users SET avatar = %s, bio = %s WHERE username = %s',
+                        (avatar, bio, session['username']))
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/unratevideo':
@@ -485,9 +533,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             videoUrl = body.get('videoUrl')
 
-            with db_cursor() as (conn, cur):
-                cur.execute('DELETE FROM ratings WHERE username = %s AND video_url = %s',
-                            (session['username'], videoUrl))
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('DELETE FROM ratings WHERE username = %s AND video_url = %s',
+                        (session['username'], videoUrl))
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/ratevideo':
@@ -497,15 +548,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             videoUrl = body.get('videoUrl')
             rating = body.get('rating')
 
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT id FROM ratings WHERE username = %s AND video_url = %s',
-                            (session['username'], videoUrl))
-                existing = cur.fetchone()
-                if existing:
-                    cur.execute('UPDATE ratings SET rating = %s WHERE id = %s', (rating, existing['id']))
-                else:
-                    cur.execute('INSERT INTO ratings (username, video_url, rating) VALUES (%s, %s, %s)',
-                                (session['username'], videoUrl, rating))
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT id FROM ratings WHERE username = %s AND video_url = %s',
+                        (session['username'], videoUrl))
+            existing = cur.fetchone()
+            if existing:
+                cur.execute('UPDATE ratings SET rating = %s WHERE id = %s', (rating, existing['id']))
+            else:
+                cur.execute('INSERT INTO ratings (username, video_url, rating) VALUES (%s, %s, %s)',
+                            (session['username'], videoUrl, rating))
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/ping':
@@ -532,27 +586,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
             emoji = body.get('emoji')
             username = session['username']
 
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    '''SELECT id, reactions FROM messages
-                       WHERE (sender = %s AND recipient = %s) OR (sender = %s AND recipient = %s)
-                       ORDER BY id''',
-                    (user1, user2, user2, user1)
-                )
-                conv = cur.fetchall()
-                if index is not None and 0 <= index < len(conv):
-                    msg_id = conv[index]['id']
-                    reactions = conv[index]['reactions'] if conv[index]['reactions'] else {}
-                    if emoji not in reactions:
-                        reactions[emoji] = []
-                    if username in reactions[emoji]:
-                        reactions[emoji].remove(username)
-                        if not reactions[emoji]:
-                            del reactions[emoji]
-                    else:
-                        reactions[emoji].append(username)
-                    cur.execute('UPDATE messages SET reactions = %s WHERE id = %s',
-                                (json.dumps(reactions), msg_id))
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                '''SELECT id, reactions FROM messages
+                   WHERE (sender = %s AND recipient = %s) OR (sender = %s AND recipient = %s)
+                   ORDER BY id''',
+                (user1, user2, user2, user1)
+            )
+            conv = cur.fetchall()
+            if index is not None and 0 <= index < len(conv):
+                msg_id = conv[index]['id']
+                reactions = conv[index]['reactions'] if conv[index]['reactions'] else {}
+                if emoji not in reactions:
+                    reactions[emoji] = []
+                if username in reactions[emoji]:
+                    reactions[emoji].remove(username)
+                    if not reactions[emoji]:
+                        del reactions[emoji]
+                else:
+                    reactions[emoji].append(username)
+                cur.execute('UPDATE messages SET reactions = %s WHERE id = %s',
+                            (json.dumps(reactions), msg_id))
+                conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/saveprogress':
@@ -564,21 +621,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
             duration = body.get('duration', 0)
             watched = body.get('watched', False)
 
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT id FROM progress WHERE username = %s AND video_url = %s',
-                            (session['username'], videoUrl))
-                existing = cur.fetchone()
-                if existing:
-                    cur.execute(
-                        'UPDATE progress SET current_time_sec = %s, duration = %s, watched = %s WHERE id = %s',
-                        (current, duration, watched, existing['id'])
-                    )
-                else:
-                    cur.execute(
-                        '''INSERT INTO progress (username, video_url, current_time_sec, duration, watched)
-                           VALUES (%s, %s, %s, %s, %s)''',
-                        (session['username'], videoUrl, current, duration, watched)
-                    )
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT id FROM progress WHERE username = %s AND video_url = %s',
+                        (session['username'], videoUrl))
+            existing = cur.fetchone()
+            if existing:
+                cur.execute(
+                    'UPDATE progress SET current_time_sec = %s, duration = %s, watched = %s WHERE id = %s',
+                    (current, duration, watched, existing['id'])
+                )
+            else:
+                cur.execute(
+                    '''INSERT INTO progress (username, video_url, current_time_sec, duration, watched)
+                       VALUES (%s, %s, %s, %s, %s)''',
+                    (session['username'], videoUrl, current, duration, watched)
+                )
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/togglefavorite':
@@ -587,18 +647,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             videoUrl = body.get('videoUrl')
 
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT id FROM favorites WHERE username = %s AND video_url = %s',
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT id FROM favorites WHERE username = %s AND video_url = %s',
+                        (session['username'], videoUrl))
+            existing = cur.fetchone()
+            if existing:
+                cur.execute('DELETE FROM favorites WHERE id = %s', (existing['id'],))
+                conn.commit()
+                cur.close(); put_db(conn)
+                self.send_json({'success': True, 'favorited': False})
+            else:
+                cur.execute('INSERT INTO favorites (username, video_url) VALUES (%s, %s)',
                             (session['username'], videoUrl))
-                existing = cur.fetchone()
-                if existing:
-                    cur.execute('DELETE FROM favorites WHERE id = %s', (existing['id'],))
-                    favorited = False
-                else:
-                    cur.execute('INSERT INTO favorites (username, video_url) VALUES (%s, %s)',
-                                (session['username'], videoUrl))
-                    favorited = True
-            self.send_json({'success': True, 'favorited': favorited})
+                conn.commit()
+                cur.close(); put_db(conn)
+                self.send_json({'success': True, 'favorited': True})
 
         elif path == '/api/togglelike':
             session = require_auth(self)
@@ -607,18 +671,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             videoUrl = body.get('videoUrl')
             action = body.get('action')
 
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT id, action FROM likes WHERE username = %s AND video_url = %s',
-                            (session['username'], videoUrl))
-                existing = cur.fetchone()
-                if existing:
-                    if existing['action'] == action:
-                        cur.execute('DELETE FROM likes WHERE id = %s', (existing['id'],))
-                    else:
-                        cur.execute('UPDATE likes SET action = %s WHERE id = %s', (action, existing['id']))
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT id, action FROM likes WHERE username = %s AND video_url = %s',
+                        (session['username'], videoUrl))
+            existing = cur.fetchone()
+            if existing:
+                if existing['action'] == action:
+                    cur.execute('DELETE FROM likes WHERE id = %s', (existing['id'],))
                 else:
-                    cur.execute('INSERT INTO likes (username, video_url, action) VALUES (%s, %s, %s)',
-                                (session['username'], videoUrl, action))
+                    cur.execute('UPDATE likes SET action = %s WHERE id = %s', (action, existing['id']))
+            else:
+                cur.execute('INSERT INTO likes (username, video_url, action) VALUES (%s, %s, %s)',
+                            (session['username'], videoUrl, action))
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/addcomment':
@@ -627,13 +694,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             new_id = int(datetime.now().timestamp() * 1000)
 
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    '''INSERT INTO comments (id, video_url, username, avatar, text, time)
-                       VALUES (%s, %s, %s, %s, %s, %s)''',
-                    (new_id, body.get('videoUrl'), session['username'], body.get('avatar', '😀'),
-                     body.get('text'), datetime.now().strftime('%b %d, %H:%M'))
-                )
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                '''INSERT INTO comments (id, video_url, username, avatar, text, time)
+                   VALUES (%s, %s, %s, %s, %s, %s)''',
+                (new_id, body.get('videoUrl'), session['username'], body.get('avatar', '😀'),
+                 body.get('text'), datetime.now().strftime('%b %d, %H:%M'))
+            )
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/deletecomment':
@@ -642,13 +712,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             comment_id = body.get('id')
 
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT username FROM comments WHERE id = %s', (comment_id,))
-                target = cur.fetchone()
-                if target and target['username'] != session['username']:
-                    self.send_json({'success': False, 'message': 'Not your comment'})
-                    return
-                cur.execute('DELETE FROM comments WHERE id = %s', (comment_id,))
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT username FROM comments WHERE id = %s', (comment_id,))
+            target = cur.fetchone()
+            if target and target['username'] != session['username']:
+                cur.close(); put_db(conn)
+                self.send_json({'success': False, 'message': 'Not your comment'})
+                return
+            cur.execute('DELETE FROM comments WHERE id = %s', (comment_id,))
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/signup':
@@ -660,19 +734,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({'success': False, 'message': 'Please fill in all fields.'})
                 return
 
-            with db_cursor() as (conn, cur):
-                cur.execute('SELECT id FROM users WHERE LOWER(username) = LOWER(%s)', (username,))
-                existing = cur.fetchone()
-                if existing:
-                    self.send_json({'success': False, 'message': 'Username already taken.'})
-                    return
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT id FROM users WHERE LOWER(username) = LOWER(%s)', (username,))
+            existing = cur.fetchone()
+            if existing:
+                cur.close(); put_db(conn)
+                self.send_json({'success': False, 'message': 'Username already taken.'})
+                return
 
-                salt, hashed = hash_password(password)
-                cur.execute(
-                    '''INSERT INTO users (username, password, salt, role, avatar, bio)
-                       VALUES (%s, %s, %s, 'viewer', '😀', '')''',
-                    (username, hashed, salt)
-                )
+            salt, hashed = hash_password(password)
+            cur.execute(
+                '''INSERT INTO users (username, password, salt, role, avatar, bio)
+                   VALUES (%s, %s, %s, 'viewer', '😀', '')''',
+                (username, hashed, salt)
+            )
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/addview':
@@ -681,18 +759,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             videoUrl = body.get('videoUrl')
 
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    '''UPDATE videos SET views = COALESCE(views, 0) + 1
-                       WHERE (type = 'series' AND filename = %s) OR (type != 'series' AND url = %s)''',
-                    (videoUrl, videoUrl)
-                )
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                '''UPDATE videos SET views = COALESCE(views, 0) + 1
+                   WHERE (type = 'series' AND filename = %s) OR (type != 'series' AND url = %s)''',
+                (videoUrl, videoUrl)
+            )
+            conn.commit()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         else:
             self.send_error(404)
 
-    # ---------------- File serving ----------------
+      # ---------------- File serving ----------------
 
     def serve_file(self, filepath, content_type):
         if not os.path.exists(filepath):
