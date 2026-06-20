@@ -341,3 +341,53 @@ nav .logo { font-size: 1.2rem; color: var(--accent); }
 
 .online-dot.online  { background: #00dd66; }
 .online-dot.offline { background: var(--muted); }
+
+#playerWrap {
+  width: 100%;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+}
+
+#playerWrap video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #000;
+  object-fit: contain;
+}
+
+#playerWrap .bottom-bar-controls span,
+#playerWrap .bottom-bar-controls button {
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#seekBar, #volBar {
+  -webkit-appearance: none;
+  background: rgba(255,255,255,0.3);
+  border-radius: 999px;
+  outline: none;
+}
+
+#seekBar::-webkit-slider-thumb, #volBar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #00D4FF;
+  cursor: pointer;
+}
+
+.controls-hidden {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+#customControls, #customControls * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}

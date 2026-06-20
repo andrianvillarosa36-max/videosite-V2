@@ -34,10 +34,45 @@
   </nav>
 
   <!-- VIDEO PLAYER (hidden by default) -->
+  <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
+    <div id="playerWrap" style="position:relative; background:#000;" onclick="onPlayerTap(event)">
+        <video id="videoPlayer" playsinline></video>
+
+        <!-- LOCK OVERLAY -->
+        <button id="lockBtn" onclick="event.stopPropagation(); toggleLock()" style="position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.3); color:#fff; border-radius:6px; padding:6px 8px; font-size:1rem; cursor:pointer; width:auto; z-index:20; display:none;">🔓</button>
+
+        <!-- CUSTOM CONTROLS -->
+        <div id="customControls" style="position:absolute; inset:0; z-index:10; opacity:1; transition:opacity 0.25s;">
+          <!-- Center play/pause -->
+          <div id="centerPlayBtn" onclick="event.stopPropagation(); togglePlay()" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:54px; height:54px; background:rgba(0,0,0,0.55); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.6rem; cursor:pointer;">▶️</div>
+
+          <!-- Top right tools -->
+          <div style="position:absolute; top:8px; right:8px; display:flex; gap:6px;" onclick="event.stopPropagation()">
+            <button onclick="toggleOrientation()" id="orientBtn" style="background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.3); color:#fff; border-radius:6px; padding:6px 8px; font-size:0.95rem; cursor:pointer; width:auto;">🔄</button>
+            <button onclick="cycleSpeed()" id="speedBtn" style="background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.3); color:#fff; border-radius:6px; padding:6px 8px; font-size:0.8rem; cursor:pointer; width:auto;">1.0x</button>
+          </div>
+
+          <!-- Bottom bar -->
+          <div style="position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent, rgba(0,0,0,0.75)); padding:24px 16px 12px;" onclick="event.stopPropagation()">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+              <span id="curTime" style="color:#fff; font-size:0.7rem; min-width:34px;">0:00</span>
+              <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" style="flex:1; height:4px; accent-color:#00D4FF;" oninput="onSeek(this.value)" />
+              <span id="durTime" style="color:#fff; font-size:0.7rem; min-width:34px;">0:00</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:14px;">
+              <span onclick="togglePlay()" id="playPauseIcon" style="cursor:pointer; font-size:1.1rem;">▶️</span>
+              <span onclick="skip(-10)" style="cursor:pointer; font-size:1rem;">⏪</span>
+              <span onclick="skip(10)" style="cursor:pointer; font-size:1rem;">⏩</span>
+              <span onclick="toggleMute()" id="volIcon" style="cursor:pointer; font-size:1rem;">🔊</span>
+              <input type="range" id="volBar" min="0" max="1" value="1" step="0.05" style="width:50px; height:3px; accent-color:#00D4FF;" oninput="onVolume(this.value)" />
+              <span onclick="toggleFullscreen()" style="cursor:pointer; font-size:1.4rem; margin-left:auto; padding:8px 10px; margin-right:4px;">⛶</span>
+            </div>
+          </div>
+        </div>
+    </div>
     <button class="back-btn" onclick="goBack()">← Back to videos</button>
     <div class="player-wrap">
-      <video id="videoPlayer" controls></video>
       <p class="player-title" id="playerTitle"></p>
       <div id="playerTags" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
       <div id="likeBar" style="display:flex; gap:10px; margin-top:12px;"></div>
@@ -120,6 +155,173 @@
   </div>
 
   <script>
+    // ===== CUSTOM PLAYER LOGIC =====
+    let controlsHideTimer = null;
+    let isLocked = false;
+    const speedOptions = [1, 1.25, 1.5, 2, 0.5];
+    let speedIndex = 0;
+
+    function formatTime(sec) {
+      if (!isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function togglePlay() {
+      const v = document.getElementById('videoPlayer');
+      if (v.paused) { v.play(); } else { v.pause(); }
+    }
+
+    function skip(amount) {
+      const v = document.getElementById('videoPlayer');
+      v.currentTime = Math.min(Math.max(0, v.currentTime + amount), v.duration || 0);
+      showControls();
+    }
+
+    function onSeek(value) {
+      const v = document.getElementById('videoPlayer');
+      if (v.duration) v.currentTime = (value / 100) * v.duration;
+    }
+
+    function onVolume(value) {
+      const v = document.getElementById('videoPlayer');
+      v.volume = value;
+      document.getElementById('volIcon').textContent = value == 0 ? '🔇' : '🔊';
+    }
+
+    function toggleMute() {
+      const v = document.getElementById('videoPlayer');
+      v.muted = !v.muted;
+      document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
+    }
+
+    async function toggleOrientation() {
+      const wrap = document.getElementById('playerWrap');
+
+      // Make sure we're fullscreen first (needed for orientation lock to work on most browsers)
+      if (!document.fullscreenElement) {
+        try {
+          await wrap.requestFullscreen();
+        } catch (e) {
+          // ignore, will still try to lock below
+        }
+      }
+
+      if (screen.orientation && screen.orientation.lock) {
+        try {
+          const current = screen.orientation.type || '';
+          if (current.startsWith('landscape')) {
+            await screen.orientation.unlock();
+          } else {
+            await screen.orientation.lock('landscape');
+          }
+        } catch (e) {
+          // some browsers block lock outside fullscreen or unsupported, ignore silently
+        }
+      }
+    }
+
+    function cycleSpeed() {
+      speedIndex = (speedIndex + 1) % speedOptions.length;
+      const v = document.getElementById('videoPlayer');
+      v.playbackRate = speedOptions[speedIndex];
+      document.getElementById('speedBtn').textContent = speedOptions[speedIndex] + 'x';
+      showControls();
+    }
+
+    function toggleFullscreen() {
+      const wrap = document.getElementById('playerWrap');
+      if (!document.fullscreenElement) {
+        wrap.requestFullscreen().catch(function() {});
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function toggleLock() {
+      isLocked = !isLocked;
+      const lockBtn = document.getElementById('lockBtn');
+      const controls = document.getElementById('customControls');
+      lockBtn.textContent = isLocked ? '🔒' : '🔓';
+      if (isLocked) {
+        controls.classList.add('controls-hidden');
+      } else {
+        controls.classList.remove('controls-hidden');
+        showControls();
+      }
+    }
+
+    function onPlayerTap(e) {
+      if (isLocked) {
+        document.getElementById('lockBtn').style.display = 'block';
+        clearTimeout(window._lockBtnTimer);
+        window._lockBtnTimer = setTimeout(function() {
+          document.getElementById('lockBtn').style.display = 'none';
+        }, 2000);
+        return;
+      }
+      const controls = document.getElementById('customControls');
+      if (controls.classList.contains('controls-hidden')) {
+        showControls();
+      } else {
+        hideControlsNow();
+      }
+    }
+
+    function showControls() {
+      if (isLocked) return;
+      const controls = document.getElementById('customControls');
+      controls.classList.remove('controls-hidden');
+      document.getElementById('lockBtn').style.display = 'block';
+      clearTimeout(controlsHideTimer);
+      const v = document.getElementById('videoPlayer');
+      if (!v.paused) {
+        controlsHideTimer = setTimeout(hideControlsNow, 3000);
+      }
+    }
+
+    function hideControlsNow() {
+      if (isLocked) return;
+      document.getElementById('customControls').classList.add('controls-hidden');
+      document.getElementById('lockBtn').style.display = 'none';
+    }
+
+    function setupCustomPlayer() {
+      const v = document.getElementById('videoPlayer');
+      isLocked = false;
+      document.getElementById('lockBtn').textContent = '🔓';
+      document.getElementById('lockBtn').style.display = 'none';
+      speedIndex = 0;
+      v.playbackRate = 1;
+      document.getElementById('speedBtn').textContent = '1.0x';
+      document.getElementById('customControls').classList.remove('controls-hidden');
+
+      v.onplay = function() {
+        document.getElementById('playPauseIcon').textContent = '⏸️';
+        document.getElementById('centerPlayBtn').style.display = 'none';
+        showControls();
+      };
+      v.onpause = function() {
+        document.getElementById('playPauseIcon').textContent = '▶️';
+        document.getElementById('centerPlayBtn').style.display = 'flex';
+        clearTimeout(controlsHideTimer);
+      };
+      v.ontimeupdate = function() {
+        document.getElementById('curTime').textContent = formatTime(v.currentTime);
+        if (v.duration) {
+          document.getElementById('seekBar').value = (v.currentTime / v.duration) * 100;
+        }
+      };
+      v.onloadedmetadata = function() {
+        document.getElementById('durTime').textContent = formatTime(v.duration);
+      };
+      v.onvolumechange = function() {
+        document.getElementById('volIcon').textContent = v.muted || v.volume == 0 ? '🔇' : '🔊';
+      };
+    }
+    // ===== END CUSTOM PLAYER LOGIC =====
+
     // Apply saved theme on load
     (function() {
       const themes = {
@@ -436,6 +638,7 @@
       savedScrollY = window.scrollY;
       const videoEl = document.getElementById('videoPlayer');
       videoEl.src   = url;
+      setupCustomPlayer();
       window._currentVideoUrl = url;
       fetch('/api/addview', {
         method: 'POST',
@@ -628,6 +831,7 @@
       document.getElementById('seriesSection').style.display  = 'none';
       document.getElementById('playerSection').style.display  = 'block';
       document.getElementById('videoPlayer').src              = ep.url;
+      setupCustomPlayer();
       document.getElementById('playerTitle').textContent      = currentSeries.title + ' — ' + ep.title;
 
       // Refresh likes fresh for this episode
