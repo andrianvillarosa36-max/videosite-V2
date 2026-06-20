@@ -514,8 +514,11 @@
     pingOnline();
     setInterval(pingOnline, 30000);
 
+    let chatToken = 0;
+
     function openChat(username) {
       currentChat = username;
+      chatToken++;
       document.getElementById('userListPage').style.display = 'none';
       document.getElementById('chatPage').style.display     = 'flex';
       document.getElementById('chatName').textContent       = username;
@@ -527,6 +530,7 @@
 
     function goBack() {
       currentChat = null;
+      chatToken++;
       clearInterval(pollInterval);
       document.getElementById('chatPage').style.display     = 'none';
       document.getElementById('userListPage').style.display = 'flex';
@@ -534,8 +538,14 @@
     }
 
     async function loadMessages() {
-      const res  = await fetch('/api/messages?user1=' + user.username + '&user2=' + currentChat);
+      const myToken    = chatToken;
+      const targetChat = currentChat;
+      const res  = await fetch('/api/messages?user1=' + user.username + '&user2=' + targetChat);
       const msgs = await res.json();
+
+      // If the user switched chats while this request was in flight, discard the result.
+      if (myToken !== chatToken || targetChat !== currentChat) return;
+
       const box  = document.getElementById('messages');
       const wasAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
 
