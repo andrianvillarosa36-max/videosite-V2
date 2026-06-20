@@ -460,11 +460,12 @@
 
       paged.forEach(function(v) {
         const videoUrl     = v.url || '';
-        const videoRatings = allRatings.filter(function(r) { return r.videoUrl === videoUrl; });
+        const ratingId     = v.type === 'series' ? (v.filename || v.title) : videoUrl;
+        const videoRatings = allRatings.filter(function(r) { return r.videoUrl === ratingId; });
         const avg = videoRatings.length
           ? (videoRatings.reduce(function(a,b) { return a + b.rating; }, 0) / videoRatings.length).toFixed(1)
           : null;
-        const myRating = allRatings.find(function(r) { return r.videoUrl === videoUrl && r.username === user.username; });
+        const myRating = allRatings.find(function(r) { return r.videoUrl === ratingId && r.username === user.username; });
 
         let stars = '';
         const fullStars = avg ? Math.round(avg) : 0;
@@ -506,7 +507,7 @@
                '<div class="thumb-title" style="flex:1;">' + v.title + '</div>' +
                '<span class="fav-heart" onclick="event.stopPropagation(); toggleFav(\'' + videoUrl.replace(/'/g,"\\'") + '\')" style="cursor:pointer;">' + (isFav ? '❤️' : '🤍') + '</span>' +
              '</div>' +
-             (v.type !== 'series' ? '<div style="display:flex; gap:2px; margin-top:4px;">' + stars + '</div>' : '') +
+             '<div style="display:flex; gap:2px; margin-top:4px;">' + stars + '</div>' +
              tagBadgesHtml + // Safe insertion of dynamic loop tags layout markup
              (continu ? '<div style="background:rgba(0,0,0,0.5); border-radius:999px; height:4px; margin-top:6px; overflow:hidden;"><div style="background:#FFD700; width:' + pct + '%; height:100%;"></div></div>' : '') +
            '</div>' +
@@ -626,6 +627,17 @@
           starsHtml += '<span onclick="rateVideo(\'' + videoUrl.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.4rem; color:' + color + ';">★</span>';
         }
         seriesRatingBox.innerHTML = '<div style="display:flex; align-items:center; gap:8px;">' + starsHtml + (avg ? '<span style="color:#8B949E; font-size:0.8rem;">' + avg + ' / 5</span>' : '') + '</div>';
+        renderRatedRows();
+      } else if (document.getElementById('playerSection').style.display === 'block') {
+        // Regular video player is open — redraw just its star row in place
+        const playerStarsBox = document.querySelector('#likeBar span[style*="margin-left:8px"]');
+        const newMyRating = allRatings.find(function(r) { return r.videoUrl === videoUrl && r.username === user.username; });
+        let starsHtml2 = '';
+        for (let s = 1; s <= 5; s++) {
+          const color = newMyRating && newMyRating.rating >= s ? '#FFD700' : '#30363D';
+          starsHtml2 += '<span onclick="rateVideo(\'' + videoUrl.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + color + ';">★</span>';
+        }
+        if (playerStarsBox) playerStarsBox.innerHTML = starsHtml2;
         renderRatedRows();
       } else {
         loadVideos();
@@ -1063,12 +1075,30 @@
     }
 
     async function toggleFav(videoUrl) {
-      await authFetch('/api/togglefavorite', {
+      const res  = await authFetch('/api/togglefavorite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user.username, videoUrl })
       });
-      loadVideos();
+      const data = await res.json();
+
+      // Update local cache immediately
+      if (data.favorited) {
+        if (!allFavorites.includes(videoUrl)) allFavorites.push(videoUrl);
+      } else {
+        allFavorites = allFavorites.filter(function(u) { return u !== videoUrl; });
+      }
+
+      // If the player or series page is open, update the heart icon in place
+      const playerHeart = document.querySelector('#likeBar span[onclick*="toggleFav"]');
+      if (playerHeart) playerHeart.textContent = data.favorited ? '❤️' : '🤍';
+
+      if (document.getElementById('playerSection').style.display !== 'block' &&
+          document.getElementById('seriesSection').style.display !== 'block') {
+        loadVideos();
+      } else {
+        renderRatedRows();
+      }
     }
 
     async function toggleLike(videoUrl, action) {
