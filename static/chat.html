@@ -540,10 +540,16 @@
       loadUsers();
     }
 
+    let debugFrozen = false;
     function debugLog(msg) {
+      if (debugFrozen) return;
       const el = document.getElementById('debugLog');
       if (el) el.textContent += msg + '\n';
-    }
+      if (el && el.textContent.split('\n').length > 60) {
+        debugFrozen = true;
+        el.textContent += '--- LOG FROZEN (60 lines reached) ---\n';
+      }
+    }    
 
     async function loadMessages(myToken) {
       if (myToken === undefined) myToken = chatToken;
