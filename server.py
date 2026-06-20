@@ -40,6 +40,22 @@ def get_db():
 def put_db(conn):
     get_pool().putconn(conn)
 
+from contextlib import contextmanager
+
+@contextmanager
+def db_cursor():
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        yield conn, cur
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        put_db(conn)
+
 # ---------- Auth helpers ----------
 
 def create_session(username, role):
