@@ -202,7 +202,9 @@
     }
 
     function logout() {
+      authFetch('/api/logout', { method: 'POST' }).catch(function() {});
       sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
       window.location.href = '/login.html';
     }
 

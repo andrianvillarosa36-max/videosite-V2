@@ -640,7 +640,7 @@
       videoEl.src   = url;
       setupCustomPlayer();
       window._currentVideoUrl = url;
-      fetch('/api/addview', {
+      authFetch('/api/addview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl: url })
@@ -750,7 +750,7 @@
       savedScrollY = window.scrollY;
       window.scrollTo(0, 0);
       window._currentSeriesId = v.filename || v.title;
-      fetch('/api/addview', {
+      authFetch('/api/addview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl: window._currentSeriesId })
@@ -909,13 +909,15 @@
     }
 
     function logout() {
+      authFetch('/api/logout', { method: 'POST' }).catch(function() {});
       sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
       window.location.href = '/login.html';
     }
 
     async function pingOnline() {
       if (!user || !user.username) return;
-      await fetch('/api/ping', {
+      await authFetch('/api/ping', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user.username })

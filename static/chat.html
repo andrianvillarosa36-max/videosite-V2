@@ -494,7 +494,7 @@
     }
 
     async function pingOnline() {
-      await fetch('/api/ping', {
+      await authFetch('/api/ping', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user.username })
@@ -596,7 +596,7 @@
       });
 
       if (wasAtBottom) box.scrollTop = box.scrollHeight;
-      await fetch('/api/markread', {
+      await authFetch('/api/markread', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ from: currentChat, to: user.username })
@@ -692,7 +692,9 @@
     }
 
     function logout() {
+      authFetch('/api/logout', { method: 'POST' }).catch(function() {});
       sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
       window.location.href = '/login.html';
     }
 
@@ -726,7 +728,7 @@
 
     async function react(index, emoji) {
       hideEmojiPicker();
-      await fetch('/api/addreaction', {
+      await authFetch('/api/addreaction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

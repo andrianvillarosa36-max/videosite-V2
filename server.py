@@ -13,7 +13,7 @@ sessions = {}  # token -> { 'username': ..., 'role': ... }
 
 def create_session(username, role):
     token = secrets.token_hex(32)
-    sessions[token] = { 'username': username, 'role': role }
+    sessions[token] = { 'username': username, 'role': role, 'created': datetime.now() }
     return token
 
 def get_session(self):
@@ -21,7 +21,13 @@ def get_session(self):
     if not auth.startswith('Bearer '):
         return None
     token = auth[7:]
-    return sessions.get(token)
+    session = sessions.get(token)
+    if not session:
+        return None
+    if datetime.now() - session.get('created', datetime.now()) > SESSION_LIFETIME:
+        del sessions[token]
+        return None
+    return session
 
 def require_auth(self):
     session = get_session(self)
@@ -32,6 +38,14 @@ def require_auth(self):
         self.wfile.write(json.dumps({ 'success': False, 'message': 'Not logged in' }).encode())
         return None
     return session
+
+SESSION_LIFETIME = timedelta(hours=12)
+
+def cleanup_sessions():
+    now = datetime.now()
+    expired = [t for t, s in sessions.items() if now - s.get('created', now) > SESSION_LIFETIME]
+    for t in expired:
+        del sessions[t]
 
 def require_admin(self):
     session = require_auth(self)
@@ -97,6 +111,18 @@ def parse_multipart(rfile, content_type, content_length):
 class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
+        try:
+            self._do_GET_inner()
+        except Exception as e:
+            try:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({ 'success': False, 'message': 'Bad request' }).encode())
+            except Exception:
+                pass
+
+    def _do_GET_inner(self):
         path = self.path.split('?')[0]
 
         if path == '/' or path == '/index.html':
@@ -183,6 +209,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
+        try:
+            self._do_POST_inner()
+        except Exception as e:
+            try:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({ 'success': False, 'message': 'Bad request' }).encode())
+            except Exception:
+                pass
+
+    def _do_POST_inner(self):
         path = self.path.split('?')[0]
         length = int(self.headers.get('Content-Length', 0))
 
@@ -302,10 +340,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/markread':
+            session = require_auth(self)
+            if not session: return
             body = json.loads(self.rfile.read(length))
             msgs = load_json('messages.json')
             for m in msgs:
-                if m['from'] == body.get('from') and m['to'] == body.get('to'):
+                if m['from'] == body.get('from') and m['to'] == session['username']:
                     m['read'] = True
             save_json('messages.json', msgs)
             self.send_json({ 'success': True })
@@ -353,19 +393,28 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/ping':
-            body = json.loads(self.rfile.read(length))
-            username = body.get('username')
-            if username:
-                online_users[username] = datetime.now()
+            session = require_auth(self)
+            if not session: return
+            online_users[session['username']] = datetime.now()
+            self.send_json({ 'success': True })
+
+        elif path == '/api/logout':
+            auth = self.headers.get('Authorization', '')
+            if auth.startswith('Bearer '):
+                token = auth[7:]
+                if token in sessions:
+                    del sessions[token]
             self.send_json({ 'success': True })
 
         elif path == '/api/addreaction':
-            body    = json.loads(self.rfile.read(length))
-            user1   = body.get('user1')
-            user2   = body.get('user2')
-            index   = body.get('index')
-            emoji   = body.get('emoji')
-            username = body.get('username')
+            session  = require_auth(self)
+            if not session: return
+            body     = json.loads(self.rfile.read(length))
+            user1    = body.get('user1')
+            user2    = body.get('user2')
+            index    = body.get('index')
+            emoji    = body.get('emoji')
+            username = session['username']
             msgs    = load_json('messages.json')
             conv    = [m for m in msgs if
                        (m['from'] == user1 and m['to'] == user2) or
@@ -497,6 +546,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/addview':
+            session  = require_auth(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
             videoUrl = body.get('videoUrl')
             videos   = load_json('videos.json')

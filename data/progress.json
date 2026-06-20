@@ -72,7 +72,7 @@
   {
     "username": "Test account 1",
     "videoUrl": "https://files.catbox.moe/nz75m0.mp4",
-    "current": 49.656254,
+    "current": 51.129247,
     "duration": 4959.962,
     "watched": false
   },
@@ -81,6 +81,13 @@
     "videoUrl": "https://files.catbox.moe/gqfuml.mp4",
     "current": 2613.853447,
     "duration": 3909.833333,
+    "watched": false
+  },
+  {
+    "username": "Test account 1",
+    "videoUrl": "https://files.catbox.moe/7lwevy.mp4",
+    "current": 0.306396,
+    "duration": 10.888707,
     "watched": false
   }
 ]
