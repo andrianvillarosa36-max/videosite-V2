@@ -361,9 +361,6 @@
 </head>
 <body>
 
-  <!-- DEBUG LOG -->
-  <div id="debugLog" style="position:fixed; bottom:0; left:0; right:0; max-height:140px; overflow-y:auto; background:rgba(0,0,0,0.9); color:#0f0; font-size:0.6rem; font-family:monospace; padding:6px; z-index:9999; white-space:pre-wrap;"></div>
-
   <!-- TOP BAR -->
   <div class="top-bar">
     <div class="logo">🌽 AnimeCorn</div>
@@ -541,24 +538,11 @@
       loadUsers();
     }
 
-    let debugFrozen = false;
-    function debugLog(msg) {
-      if (debugFrozen) return;
-      const el = document.getElementById('debugLog');
-      if (el) el.textContent += msg + '\n';
-      if (el && el.textContent.split('\n').length > 60) {
-        debugFrozen = true;
-        el.textContent += '--- LOG FROZEN (60 lines reached) ---\n';
-      }
-    }    
-
     async function loadMessages(myToken) {
       if (myToken === undefined) myToken = chatToken;
       const targetChat = currentChat;
-      debugLog('START tok=' + myToken + ' target=' + targetChat + ' liveTok=' + chatToken);
       const res  = await fetch('/api/messages?user1=' + user.username + '&user2=' + targetChat);
       const msgs = await res.json();
-      debugLog('RESOLVED tok=' + myToken + ' target=' + targetChat + ' liveTok=' + chatToken + ' liveChat=' + currentChat + ' render=' + (myToken === chatToken));
 
       // Only the single most-recent request is allowed to render, regardless of
       // network arrival order. Anything else is stale and discarded.
