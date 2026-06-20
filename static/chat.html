@@ -453,25 +453,34 @@
 
     let currentChat  = null;
     let pollInterval = null;
+    let loadUsersToken = 0;
 
     async function loadUsers() {
+      const myToken = ++loadUsersToken;
+
       const res    = await fetch('/api/users');
       const users  = await res.json();
       const oRes   = await fetch('/api/online');
       const online = await oRes.json();
-      const list   = document.getElementById('userList');
       const others = users.filter(u => u.username !== user.username && u.role !== 'admin');
+
+      const unreadCounts = await Promise.all(others.map(u => getUnreadCount(u.username)));
+
+      // If a newer loadUsers() call started while we were awaiting, abandon this one.
+      if (myToken !== loadUsersToken) return;
+
+      const list = document.getElementById('userList');
 
       if (others.length === 0) {
         list.innerHTML = '<p style="color:#8B949E;padding:16px;">No other users yet.</p>';
         return;
       }
 
-      list.innerHTML = '';
-      for (const u of others) {
-        const unread   = await getUnreadCount(u.username);
+      let html = '';
+      others.forEach((u, i) => {
+        const unread   = unreadCounts[i];
         const isOnline = online.hasOwnProperty(u.username);
-        list.innerHTML += `
+        html += `
           <div class="user-item" onclick="openChat('${u.username}')">
             <div class="avatar">
               ${u.username.slice(0,2).toUpperCase()}
@@ -484,7 +493,8 @@
             ${unread > 0 ? `<span class="unread">${unread}</span>` : ''}
           </div>
         `;
-      }
+      });
+      list.innerHTML = html;
     }
 
     async function getUnreadCount(from) {
