@@ -381,7 +381,7 @@
       // Map and match actual video metadata blocks to user score inputs 
       const ranked = targetRatings
         .map(r => {
-          const videoInfo = videos.find(v => v.url === r.videoUrl);
+          const videoInfo = videos.find(v => (v.type === 'series' ? v.filename : v.url) === r.videoUrl);
           return {
             ...videoInfo,
             personalScore: r.rating
@@ -427,7 +427,7 @@
       let renderedCount = 0;
 
       mine.forEach(r => {
-        const v = videos.find(v => v.url === r.videoUrl);
+        const v = videos.find(v => (v.type === 'series' ? v.filename : v.url) === r.videoUrl);
         if (!v) return;
         
         renderedCount++;
