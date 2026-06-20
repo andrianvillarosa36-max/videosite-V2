@@ -245,6 +245,15 @@
     const loggedInUser = JSON.parse(sessionStorage.getItem('user') || 'null');
     if (!loggedInUser) window.location.href = '/login.html';
 
+    const token = sessionStorage.getItem('token');
+
+    function authFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, options);
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const targetUsername = urlParams.get('username') || loggedInUser.username;
     const isOwnProfile = (targetUsername === loggedInUser.username);
@@ -325,7 +334,7 @@
     async function saveProfile() {
       if (!isOwnProfile) return;
       const bio = document.getElementById('bioInput').value.trim();
-      const res = await fetch('/api/updateprofile', {
+      const res = await authFetch('/api/updateprofile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: loggedInUser.username, avatar: selectedAvatar, bio })

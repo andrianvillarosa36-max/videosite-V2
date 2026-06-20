@@ -66,6 +66,7 @@
 
       if (data.success) {
         sessionStorage.setItem('user', JSON.stringify(data));
+        sessionStorage.setItem('token', data.token);
         if (data.role === 'admin') {
           window.location.href = '/admin.html';
         } else {

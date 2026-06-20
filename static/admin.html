@@ -70,6 +70,15 @@
     const user = JSON.parse(sessionStorage.getItem('user') || 'null');
     if (!user || user.role !== 'admin') window.location.href = '/login.html';
 
+    const token = sessionStorage.getItem('token');
+
+    function authFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, options);
+    }
+
     let currentType   = 'video';
     let episodeCount  = 0;
 
@@ -164,7 +173,7 @@
         body = { title, thumb, category, type: 'series', episodes };
       }
 
-      const res  = await fetch('/api/addvideo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res  = await authFetch('/api/addvideo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
 
       if (data.success) {
@@ -183,7 +192,7 @@
 
     async function deleteVideo(id) {
       if (!confirm('Delete this video?')) return;
-      const res  = await fetch('/api/delete', {
+      const res  = await authFetch('/api/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: id })

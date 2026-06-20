@@ -9,6 +9,52 @@ online_users = {}
 import hashlib
 import secrets
 
+sessions = {}  # token -> { 'username': ..., 'role': ... }
+
+def create_session(username, role):
+    token = secrets.token_hex(32)
+    sessions[token] = { 'username': username, 'role': role }
+    return token
+
+def get_session(self):
+    auth = self.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return None
+    token = auth[7:]
+    return sessions.get(token)
+
+def require_auth(self):
+    session = get_session(self)
+    if not session:
+        self.send_response(401)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({ 'success': False, 'message': 'Not logged in' }).encode())
+        return None
+    return session
+
+def require_admin(self):
+    session = require_auth(self)
+    if not session:
+        return None
+    if session['role'] != 'admin':
+        self.send_response(403)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({ 'success': False, 'message': 'Admin only' }).encode())
+        return None
+    return session
+
+def safe_join(base_dir, filename):
+    # Strip any path components, keep just the filename itself
+    filename = os.path.basename(filename)
+    full_path = os.path.normpath(os.path.join(base_dir, filename))
+    base_abs = os.path.abspath(base_dir)
+    full_abs = os.path.abspath(full_path)
+    if not full_abs.startswith(base_abs + os.sep) and full_abs != base_abs:
+        return None  # attempted path traversal
+    return full_path
+
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -65,8 +111,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(load_json('videos.json'))
         elif path.startswith('/videos/'):
             filename = path[8:]
-            filepath = os.path.join(VIDEO_DIR, filename)
-            if os.path.exists(filepath):
+            filepath = safe_join(VIDEO_DIR, filename)
+            if filepath and os.path.exists(filepath):
                 self.serve_file(filepath, 'video/mp4')
             else:
                 self.send_error(404)
@@ -165,9 +211,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self.send_json({ 'success': False, 'message': 'Wrong username or password' })
                     return
 
-            self.send_json({ 'success': True, 'role': matched['role'], 'username': matched['username'] })
+            token = create_session(matched['username'], matched['role'])
+            self.send_json({ 'success': True, 'role': matched['role'], 'username': matched['username'], 'token': token })
 
         elif path == '/api/addvideo':
+            session = require_admin(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
             title    = body.get('title', 'Untitled')
             thumb    = body.get('thumb', '')
@@ -190,21 +239,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self.send_json({ 'success': False, 'message': 'No URL provided' })
 
         elif path == '/api/delete':
+            session = require_admin(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
-            filename = body.get('filename')
+            filename = body.get('filename', '')
             videos   = load_json('videos.json')
             videos   = [v for v in videos if v['filename'] != filename]
             save_json('videos.json', videos)
-            filepath = os.path.join(VIDEO_DIR, filename)
-            if os.path.exists(filepath):
+            filepath = safe_join(VIDEO_DIR, filename)
+            if filepath and os.path.exists(filepath) and os.path.isfile(filepath):
                 os.remove(filepath)
             self.send_json({ 'success': True })
 
         elif path == '/api/sendmessage':
+            session = require_auth(self)
+            if not session: return
             body = json.loads(self.rfile.read(length))
             msgs = load_json('messages.json')
             msgs.append({
-                'from':    body.get('from'),
+                'from':    session['username'],
                 'to':      body.get('to'),
                 'content': body.get('content'),
                 'type':    body.get('type', 'text'),
@@ -215,9 +268,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/deletemessage':
+            session = require_auth(self)
+            if not session: return
             body  = json.loads(self.rfile.read(length))
             index = body.get('index')
-            user1 = body.get('user1')
+            user1 = session['username']
             user2 = body.get('user2')
             msgs  = load_json('messages.json')
             conv  = [m for m in msgs if
@@ -229,10 +284,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/editmessage':
+            session = require_auth(self)
+            if not session: return
             body    = json.loads(self.rfile.read(length))
             index   = body.get('index')
             content = body.get('content')
-            user1   = body.get('user1')
+            user1   = session['username']
             user2   = body.get('user2')
             msgs    = load_json('messages.json')
             conv    = [m for m in msgs if
@@ -254,8 +311,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/updateprofile':
+            session  = require_auth(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
-            username = body.get('username')
+            username = session['username']
             avatar   = body.get('avatar')
             bio      = body.get('bio')
             users    = load_json('users.json')
@@ -267,8 +326,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/unratevideo':
+            session  = require_auth(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
-            username = body.get('username')
+            username = session['username']
             videoUrl = body.get('videoUrl')
             ratings  = load_json('ratings.json')
             ratings  = [r for r in ratings if not (r['username'] == username and r['videoUrl'] == videoUrl)]
@@ -276,8 +337,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/ratevideo':
+            session  = require_auth(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
-            username = body.get('username')
+            username = session['username']
             videoUrl = body.get('videoUrl')
             rating   = body.get('rating')
             ratings  = load_json('ratings.json')
@@ -322,8 +385,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/saveprogress':
+            session  = require_auth(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
-            username = body.get('username')
+            username = session['username']
             videoUrl = body.get('videoUrl')
             current  = body.get('current', 0)
             duration = body.get('duration', 0)
@@ -340,8 +405,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/togglefavorite':
+            session  = require_auth(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
-            username = body.get('username')
+            username = session['username']
             videoUrl = body.get('videoUrl')
             favs     = load_json('favorites.json')
             existing = next((f for f in favs if f['username'] == username and f['videoUrl'] == videoUrl), None)
@@ -355,8 +422,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({ 'success': True, 'favorited': True })
 
         elif path == '/api/togglelike':
+            session  = require_auth(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
-            username = body.get('username')
+            username = session['username']
             videoUrl = body.get('videoUrl')
             action   = body.get('action')
             likes    = load_json('likes.json')
@@ -372,12 +441,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/addcomment':
+            session  = require_auth(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
             comments = load_json('comments.json')
             comments.append({
                 'id':       str(int(datetime.now().timestamp() * 1000)),
                 'videoUrl': body.get('videoUrl'),
-                'username': body.get('username'),
+                'username': session['username'],
                 'avatar':   body.get('avatar', '😀'),
                 'text':     body.get('text'),
                 'time':     datetime.now().strftime('%b %d, %H:%M')
@@ -386,8 +457,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({ 'success': True })
 
         elif path == '/api/deletecomment':
+            session  = require_auth(self)
+            if not session: return
             body     = json.loads(self.rfile.read(length))
             comments = load_json('comments.json')
+            target   = next((c for c in comments if c['id'] == body.get('id')), None)
+            if target and target['username'] != session['username']:
+                self.send_json({ 'success': False, 'message': 'Not your comment' })
+                return
             comments = [c for c in comments if c['id'] != body.get('id')]
             save_json('comments.json', comments)
             self.send_json({ 'success': True })

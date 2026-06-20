@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "from": "Test account 1",
+    "to": "viewer2",
+    "content": "Hi",
+    "type": "text",
+    "time": "17:21",
+    "read": false
+  }
+]

@@ -144,6 +144,15 @@
 
     const user = JSON.parse(sessionStorage.getItem('user') || 'null');
     if (!user) window.location.href = '/login.html';
+   
+    const token = sessionStorage.getItem('token');
+
+    function authFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, options);
+    }
 
     let currentCategory = 'All';
     let savedScrollY = 0;
@@ -388,13 +397,13 @@
 
       // If tapping the same star, unrate it
       if (myRating && myRating.rating === star) {
-        await fetch('/api/unratevideo', {
+        await authFetch('/api/unratevideo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: user.username, videoUrl: videoUrl })
         });
       } else {
-        await fetch('/api/ratevideo', {
+        await authFetch('/api/ratevideo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: user.username, videoUrl: videoUrl, rating: star })
@@ -454,7 +463,7 @@
       window._progressTimer = setInterval(async function() {
         if (videoEl.duration && videoEl.currentTime > 0) {
           const isWatched = (videoEl.currentTime / videoEl.duration) >= 0.9;
-          await fetch('/api/saveprogress', {
+          await authFetch('/api/saveprogress', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -614,6 +623,7 @@
     async function playEpisode(idx) {
       currentEpIndex = idx;
       const ep = currentSeries.episodes[idx];
+      window._currentVideoUrl = ep.url;
       document.getElementById('likeBar').innerHTML = '';
       document.getElementById('seriesSection').style.display  = 'none';
       document.getElementById('playerSection').style.display  = 'block';
@@ -671,6 +681,7 @@
         }
       };
 
+      loadComments(ep.url, 'commentList');
       videoEl.play();
       window.scrollTo(0, 0);
     }
@@ -816,7 +827,7 @@
     }
 
     async function toggleFav(videoUrl) {
-      await fetch('/api/togglefavorite', {
+      await authFetch('/api/togglefavorite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user.username, videoUrl })
@@ -825,7 +836,7 @@
     }
 
     async function toggleLike(videoUrl, action) {
-      await fetch('/api/togglelike', {
+      await authFetch('/api/togglelike', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user.username, videoUrl, action })
@@ -932,7 +943,7 @@
       const input = document.getElementById('commentInput');
       const text  = input.value.trim();
       if (!text) return;
-      await fetch('/api/addcomment', {
+      await authFetch('/api/addcomment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl: window._currentVideoUrl, username: user.username, avatar: user.avatar, text })
@@ -945,7 +956,7 @@
       const input = document.getElementById('seriesCommentInput');
       const text  = input.value.trim();
       if (!text) return;
-      await fetch('/api/addcomment', {
+      await authFetch('/api/addcomment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl: window._currentSeriesId, username: user.username, avatar: user.avatar, text })
@@ -956,7 +967,7 @@
 
     async function deleteComment(id, listElId) {
       if (!confirm('Delete this comment?')) return;
-      await fetch('/api/deletecomment', {
+      await authFetch('/api/deletecomment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })

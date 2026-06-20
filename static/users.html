@@ -184,6 +184,15 @@
     const user = JSON.parse(sessionStorage.getItem('user') || 'null');
     if (!user) window.location.href = '/login.html';
 
+    const token = sessionStorage.getItem('token');
+
+    function authFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, options);
+    }
+
     async function loadUsers() {
       const res   = await fetch('/api/users');
       const users = await res.json();

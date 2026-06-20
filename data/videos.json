@@ -60,7 +60,8 @@
         "title": "Level 12 S1",
         "url": "https://files.catbox.moe/pdujd1.mp4"
       }
-    ]
+    ],
+    "views": 17
   },
   {
     "title": "The tunnel to summer the exit of goodbyes",
@@ -74,7 +75,8 @@
       "Drama",
       "Mystery"
     ],
-    "type": "video"
+    "type": "video",
+    "views": 9
   },
   {
     "title": "Himawari wa Yoru ni Saku",
@@ -88,7 +90,8 @@
       "18+",
       "office worker"
     ],
-    "type": "video"
+    "type": "video",
+    "views": 2
   },
   {
     "title": "Akane wa Tsumare Somerareru",
@@ -102,7 +105,8 @@
       "18+",
       "Students"
     ],
-    "type": "video"
+    "type": "video",
+    "views": 2
   },
   {
     "title": "Seika Jogakuin Kounin Sao Ojisan",
@@ -215,7 +219,8 @@
         "title": "Seggs episode 10",
         "url": "https://files.catbox.moe/4sv08n.mp4"
       }
-    ]
+    ],
+    "views": 1
   },
   {
     "title": "Showtime! Uta No Oneesan Datte Shitai",
@@ -435,7 +440,8 @@
       "18+",
       "Students"
     ],
-    "type": "video"
+    "type": "video",
+    "views": 1
   },
   {
     "title": "Oideyo! Shiritsu Yarima*ri Gakuen",
@@ -500,5 +506,14 @@
     "thumb": "https://files.catbox.moe/l1bf1t.jpg",
     "category": "Corn",
     "type": "video"
+  },
+  {
+    "title": "Cute",
+    "filename": "7lwevy.mp4",
+    "url": "https://files.catbox.moe/7lwevy.mp4",
+    "thumb": "",
+    "category": "Anime",
+    "type": "video",
+    "views": 1
   }
 ]

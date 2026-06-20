@@ -442,6 +442,15 @@
     if (!user) window.location.href = '/login.html';
     document.getElementById('welcomeMsg').textContent = user.username;
 
+    const token = sessionStorage.getItem('token');
+
+    function authFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, options);
+    }
+
     let currentChat  = null;
     let pollInterval = null;
 
@@ -605,7 +614,7 @@
         const reader = new FileReader();
         reader.onload = async function(e) {
           const type = file.type.startsWith('image') ? 'image' : 'video';
-          await fetch('/api/sendmessage', {
+          await authFetch('/api/sendmessage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ from: user.username, to: currentChat, content: e.target.result, type })
@@ -618,7 +627,7 @@
 
       if (text) {
         input.value = '';
-        await fetch('/api/sendmessage', {
+        await authFetch('/api/sendmessage', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ from: user.username, to: currentChat, content: text, type: 'text' })
@@ -647,7 +656,7 @@
 
     async function deleteMsg(index) {
       if (!confirm('Delete this message?')) return;
-      await fetch('/api/deletemessage', {
+      await authFetch('/api/deletemessage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ index, user1: user.username, user2: currentChat })
@@ -658,7 +667,7 @@
     async function editMsg(index, oldText) {
       const newText = prompt('Edit message:', oldText);
       if (!newText || newText === oldText) return;
-      await fetch('/api/editmessage', {
+      await authFetch('/api/editmessage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ index, content: newText, user1: user.username, user2: currentChat })

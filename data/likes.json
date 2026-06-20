@@ -76,11 +76,6 @@
   },
   {
     "username": "Test account 1",
-    "videoUrl": "https://files.catbox.moe/u4dcbv.mp4",
-    "action": "like"
-  },
-  {
-    "username": "Test account 1",
     "videoUrl": "https://files.catbox.moe/d7foji.mp4",
     "action": "like"
   },
@@ -92,6 +87,11 @@
   {
     "username": "Test account 1",
     "videoUrl": "https://files.catbox.moe/3d9okt.mkv",
+    "action": "like"
+  },
+  {
+    "username": "Test account 1",
+    "videoUrl": "https://files.catbox.moe/u4dcbv.mp4",
     "action": "like"
   }
 ]
