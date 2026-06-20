@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 
 online_users = {}
 sessions = {}  # token -> { 'username': ..., 'role': ..., 'created': ... }
@@ -20,13 +21,24 @@ STATIC_DIR = 'static'
 
 # ---------- Database helpers ----------
 
+_db_pool = None
+
+def get_pool():
+    global _db_pool
+    if _db_pool is None:
+        db_url = os.environ.get('DATABASE_URL')
+        if not db_url:
+            raise Exception('DATABASE_URL environment variable not set')
+        _db_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, db_url)
+    return _db_pool
+
 def get_db():
-    db_url = os.environ.get('DATABASE_URL')
-    if not db_url:
-        raise Exception('DATABASE_URL environment variable not set')
-    conn = psycopg2.connect(db_url, cursor_factory=psycopg2.extras.RealDictCursor)
+    conn = get_pool().getconn()
+    conn.cursor_factory = psycopg2.extras.RealDictCursor
     return conn
 
+def put_db(conn):
+    get_pool().putconn(conn)
 
 # ---------- Auth helpers ----------
 
@@ -195,7 +207,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('SELECT * FROM videos ORDER BY id')
             rows = cur.fetchall()
             cur.close()
-            conn.close()
+            put_db(conn)
             self.send_json([video_row_to_json(v) for v in rows])
 
         elif path.startswith('/videos/'):
@@ -212,7 +224,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('SELECT username, role, avatar, bio FROM users ORDER BY username')
             rows = cur.fetchall()
             cur.close()
-            conn.close()
+            put_db(conn)
             self.send_json([dict(r) for r in rows])
 
         elif path.startswith('/api/messages'):
@@ -230,7 +242,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             )
             rows = cur.fetchall()
             cur.close()
-            conn.close()
+            put_db(conn)
             self.send_json([message_row_to_json(m) for m in rows])
 
         elif path == '/api/ratings':
@@ -239,7 +251,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('SELECT username, video_url AS "videoUrl", rating FROM ratings ORDER BY id')
             rows = cur.fetchall()
             cur.close()
-            conn.close()
+            put_db(conn)
             self.send_json([dict(r) for r in rows])
 
         elif path == '/api/online':
@@ -257,7 +269,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('SELECT * FROM progress WHERE username = %s ORDER BY id', (username,))
             rows = cur.fetchall()
             cur.close()
-            conn.close()
+            put_db(conn)
             self.send_json([progress_row_to_json(p) for p in rows])
 
         elif path == '/api/favorites':
@@ -269,7 +281,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('SELECT username, video_url AS "videoUrl" FROM favorites WHERE username = %s ORDER BY id', (username,))
             rows = cur.fetchall()
             cur.close()
-            conn.close()
+            put_db(conn)
             self.send_json([dict(r) for r in rows])
 
         elif path == '/api/likes':
@@ -278,7 +290,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('SELECT username, video_url AS "videoUrl", action FROM likes ORDER BY id')
             rows = cur.fetchall()
             cur.close()
-            conn.close()
+            put_db(conn)
             self.send_json([dict(r) for r in rows])
 
         elif path.startswith('/api/comments'):
@@ -290,7 +302,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('SELECT * FROM comments WHERE video_url = %s ORDER BY id', (videoUrl,))
             rows = cur.fetchall()
             cur.close()
-            conn.close()
+            put_db(conn)
             self.send_json([comment_row_to_json(c) for c in rows])
 
         else:
@@ -326,14 +338,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             matched = cur.fetchone()
 
             if not matched:
-                cur.close(); conn.close()
+                cur.close(); put_db(conn)
                 self.send_json({'success': False, 'message': 'Wrong username or password'})
                 return
 
             if not matched.get('salt'):
                 # legacy plaintext password, migrate on first login
                 if matched['password'] != password:
-                    cur.close(); conn.close()
+                    cur.close(); put_db(conn)
                     self.send_json({'success': False, 'message': 'Wrong username or password'})
                     return
                 salt, hashed = hash_password(password)
@@ -342,11 +354,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 conn.commit()
             else:
                 if not verify_password(password, matched['salt'], matched['password']):
-                    cur.close(); conn.close()
+                    cur.close(); put_db(conn)
                     self.send_json({'success': False, 'message': 'Wrong username or password'})
                     return
 
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             token = create_session(matched['username'], matched['role'])
             self.send_json({'success': True, 'role': matched['role'], 'username': matched['username'], 'token': token})
 
@@ -369,7 +381,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     (title, title, thumb, category, json.dumps(episodes))
                 )
                 conn.commit()
-                cur.close(); conn.close()
+                cur.close(); put_db(conn)
                 self.send_json({'success': True})
             else:
                 url = body.get('url', '')
@@ -381,10 +393,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         (title, filename, url, thumb, category)
                     )
                     conn.commit()
-                    cur.close(); conn.close()
+                    cur.close(); put_db(conn)
                     self.send_json({'success': True})
                 else:
-                    cur.close(); conn.close()
+                    cur.close(); put_db(conn)
                     self.send_json({'success': False, 'message': 'No URL provided'})
 
         elif path == '/api/delete':
@@ -397,7 +409,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur = conn.cursor()
             cur.execute('DELETE FROM videos WHERE filename = %s', (filename,))
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
 
             filepath = safe_join(VIDEO_DIR, filename)
             if filepath and os.path.exists(filepath) and os.path.isfile(filepath):
@@ -418,7 +430,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                  body.get('type', 'text'), datetime.now().strftime('%H:%M'))
             )
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/deletemessage':
@@ -441,7 +453,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if index is not None and 0 <= index < len(conv):
                 cur.execute('DELETE FROM messages WHERE id = %s', (conv[index]['id'],))
                 conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/editmessage':
@@ -466,7 +478,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 cur.execute('UPDATE messages SET content = %s, edited = TRUE WHERE id = %s',
                             (content, conv[index]['id']))
                 conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/markread':
@@ -481,7 +493,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 (body.get('from'), session['username'])
             )
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/updateprofile':
@@ -496,7 +508,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('UPDATE users SET avatar = %s, bio = %s WHERE username = %s',
                         (avatar, bio, session['username']))
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/unratevideo':
@@ -510,7 +522,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('DELETE FROM ratings WHERE username = %s AND video_url = %s',
                         (session['username'], videoUrl))
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/ratevideo':
@@ -531,7 +543,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 cur.execute('INSERT INTO ratings (username, video_url, rating) VALUES (%s, %s, %s)',
                             (session['username'], videoUrl, rating))
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/ping':
@@ -581,7 +593,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 cur.execute('UPDATE messages SET reactions = %s WHERE id = %s',
                             (json.dumps(reactions), msg_id))
                 conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/saveprogress':
@@ -610,7 +622,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     (session['username'], videoUrl, current, duration, watched)
                 )
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/togglefavorite':
@@ -627,13 +639,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if existing:
                 cur.execute('DELETE FROM favorites WHERE id = %s', (existing['id'],))
                 conn.commit()
-                cur.close(); conn.close()
+                cur.close(); put_db(conn)
                 self.send_json({'success': True, 'favorited': False})
             else:
                 cur.execute('INSERT INTO favorites (username, video_url) VALUES (%s, %s)',
                             (session['username'], videoUrl))
                 conn.commit()
-                cur.close(); conn.close()
+                cur.close(); put_db(conn)
                 self.send_json({'success': True, 'favorited': True})
 
         elif path == '/api/togglelike':
@@ -657,7 +669,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 cur.execute('INSERT INTO likes (username, video_url, action) VALUES (%s, %s, %s)',
                             (session['username'], videoUrl, action))
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/addcomment':
@@ -675,7 +687,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                  body.get('text'), datetime.now().strftime('%b %d, %H:%M'))
             )
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/deletecomment':
@@ -689,12 +701,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('SELECT username FROM comments WHERE id = %s', (comment_id,))
             target = cur.fetchone()
             if target and target['username'] != session['username']:
-                cur.close(); conn.close()
+                cur.close(); put_db(conn)
                 self.send_json({'success': False, 'message': 'Not your comment'})
                 return
             cur.execute('DELETE FROM comments WHERE id = %s', (comment_id,))
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/signup':
@@ -711,7 +723,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             cur.execute('SELECT id FROM users WHERE LOWER(username) = LOWER(%s)', (username,))
             existing = cur.fetchone()
             if existing:
-                cur.close(); conn.close()
+                cur.close(); put_db(conn)
                 self.send_json({'success': False, 'message': 'Username already taken.'})
                 return
 
@@ -722,7 +734,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 (username, hashed, salt)
             )
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         elif path == '/api/addview':
@@ -739,7 +751,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 (videoUrl, videoUrl)
             )
             conn.commit()
-            cur.close(); conn.close()
+            cur.close(); put_db(conn)
             self.send_json({'success': True})
 
         else:
