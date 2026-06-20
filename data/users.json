@@ -9,17 +9,19 @@
   },
   {
     "username": "viewer1",
-    "password": "watch123",
+    "password": "f5f37cf3acb3dff3131ee91b7334df32a5caac7f59074fd4a56e0d7d6395fe9e",
     "role": "viewer",
     "avatar": "\ud83c\udfac",
-    "bio": "Movie lover"
+    "bio": "Movie lover",
+    "salt": "6466d1e22d7696eacf048c543c45cebf"
   },
   {
     "username": "viewer2",
-    "password": "watch456",
+    "password": "9a746f223ef2d4c09caab6543deb067f68004f5dd0fed97802695f1c75c258a4",
     "role": "viewer",
     "avatar": "\ud83d\ude00",
-    "bio": "\ud83c\udf1a\ud83c\udf1a\ud83c\udf1a"
+    "bio": "\ud83c\udf1a\ud83c\udf1a\ud83c\udf1a",
+    "salt": "2fc32a6e407a75ede15d03fe4c7eb489"
   },
   {
     "username": "Test account 1",
