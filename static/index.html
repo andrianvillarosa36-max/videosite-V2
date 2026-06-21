@@ -104,7 +104,7 @@
     <button class="back-btn" onclick="goBack()">← Back to videos</button>
     <div style="padding:16px;">
       <p id="seriesTitle" style="font-size:1.1rem; font-weight:700; margin-bottom:10px;"></p>
-      <div id="seriesFavBox" style="margin-bottom:10px;"></div>
+      <!-- Favorite/rating now shown inside the episode player itself -->
       <div id="seriesRatingBox" style="margin-bottom:14px;"></div>
 
       <div id="seriesTags" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;"></div>
@@ -780,23 +780,6 @@
       document.getElementById('filterBar').style.display     = 'none';
       document.getElementById('seriesSection').style.display = 'block';
       document.getElementById('seriesTitle').textContent     = v.title;
-
-      // Favorite button
-      const seriesFavBox = document.getElementById('seriesFavBox');
-      const isFav = allFavorites.includes(v.filename || v.title);
-      seriesFavBox.innerHTML = '<button onclick="toggleFav(\'' + (v.filename || v.title) + '\')" style="background:#1C2333; border:1px solid #30363D; border-radius:8px; padding:8px 16px; color:#fff; font-size:0.85rem; cursor:pointer; width:auto;">' + (isFav ? '❤️ Favorited' : '🤍 Favorite') + '</button>';
-
-      // Rating
-      const seriesRatingBox = document.getElementById('seriesRatingBox');
-      const videoRatings    = allRatings.filter(function(r) { return r.videoUrl === (v.filename || v.title); });
-      const avg             = videoRatings.length ? (videoRatings.reduce(function(a,b) { return a + b.rating; }, 0) / videoRatings.length).toFixed(1) : null;
-      const myRating        = allRatings.find(function(r) { return r.videoUrl === (v.filename || v.title) && r.username === user.username; });
-      let starsHtml = '';
-      for (let s = 1; s <= 5; s++) {
-        const color = myRating && myRating.rating >= s ? '#FFD700' : '#30363D';
-        starsHtml += '<span onclick="rateVideo(\'' + (v.filename || v.title) + '\',' + s + ')" style="cursor:pointer; font-size:1.4rem; color:' + color + ';">★</span>';
-      }
-      seriesRatingBox.innerHTML = '<div style="display:flex; align-items:center; gap:8px;">' + starsHtml + (avg ? '<span style="color:#8B949E; font-size:0.8rem;">' + avg + ' / 5</span>' : '') + '</div>';
 
       // --- FIXED: Inject Series Category and Tag Badges ---
       const seriesTagsBox = document.getElementById('seriesTags');
