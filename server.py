@@ -273,6 +273,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.serve_file(os.path.join(STATIC_DIR, 'adult-top.html'), 'text/html')
         elif path == '/signup.html':
             self.serve_file(os.path.join(STATIC_DIR, 'signup.html'), 'text/html')
+        elif path == '/submit.html':
+            self.serve_file(os.path.join(STATIC_DIR, 'submit.html'), 'text/html')
 
         elif path == '/api/videos':
             with db_cursor() as (conn, cur):

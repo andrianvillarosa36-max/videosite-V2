@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suggest / Upload — VideoSite</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .submit-section {
+      margin: 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .submit-title {
+      padding: 12px 16px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+    }
+
+    .form-body { padding: 0 16px 16px; }
+
+    .field { margin-bottom: 12px; }
+
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .field input,
+    .field textarea,
+    .field select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 13px;
+      color: var(--text);
+      font-size: 0.88rem;
+      font-family: inherit;
+    }
+
+    .field textarea { resize: vertical; min-height: 70px; }
+
+    .submit-btn {
+      width: 100%;
+      background: var(--accent);
+      border: none;
+      color: #000;
+      border-radius: 8px;
+      padding: 13px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .status-msg {
+      font-size: 0.8rem;
+      padding: 10px 16px;
+      display: none;
+    }
+
+    .status-msg.error { color: #ff4477; }
+    .status-msg.ok { color: #00FF88; }
+
+    .my-sub-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .my-sub-item:last-child { border-bottom: none; }
+
+    .my-sub-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .my-sub-title { font-size: 0.88rem; font-weight: 700; }
+
+    .badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+
+    .badge.pending { background: #3D3010; color: #FFD060; }
+    .badge.approved { background: #103D1E; color: #00FF88; }
+    .badge.rejected { background: #3D1018; color: #FF6680; }
+
+    .my-sub-desc {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .my-sub-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .empty-state {
+      padding: 24px 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--bg);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.2s;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav>
+    <div class="logo">📤 Suggest / Upload</div>
+    <div class="nav-right">
+      <a href="/index.html" style="color:var(--accent); font-size:0.82rem; text-decoration:none;">❌ Return</a>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- SUBMIT FORM -->
+  <div class="submit-section">
+    <div class="submit-title">🎬 Add a Video or Series</div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" id="tabSuggest" onclick="setMode('suggest')">💡 Suggest</button>
+      <button class="tab-btn" id="tabUpload" onclick="setMode('upload')">📁 Upload</button>
+    </div>
+
+    <div class="form-body">
+      <div class="field">
+        <label>Title</label>
+        <input type="text" id="fTitle" placeholder="e.g. My Favorite Movie" />
+      </div>
+
+      <div class="field">
+        <label>Description / Notes</label>
+        <textarea id="fDescription" placeholder="Tell us about it..."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Category</label>
+        <input type="text" id="fCategory" placeholder="e.g. Action, Comedy, Anime" />
+      </div>
+
+      <div class="field">
+        <label>Type</label>
+        <select id="fType">
+          <option value="video">Movie / Single Video</option>
+          <option value="series">Series</option>
+        </select>
+      </div>
+
+      <div class="field" id="fileField" style="display:none;">
+        <label>Video File (max 200MB)</label>
+        <input type="file" id="fFile" accept="video/*" />
+        <div class="hint">Large files may take a while to upload, especially on mobile data.</div>
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+
+      <div class="status-msg" id="statusMsg"></div>
+
+      <button class="submit-btn" id="submitBtn" onclick="submitForm()">Submit Suggestion</button>
+    </div>
+  </div>
+
+  <!-- MY SUBMISSIONS -->
+  <div class="submit-section">
+    <div class="submit-title">📋 My Submissions</div>
+    <div id="mySubmissionsList">
+      <div class="empty-state">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    const user  = JSON.parse(sessionStorage.getItem('user') || 'null');
+    const token = sessionStorage.getItem('token');
+    if (!user) window.location.href = '/login.html';
+
+    function authFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, options);
+    }
+
+    function logout() {
+      authFetch('/api/logout', { method: 'POST' }).catch(function() {});
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      window.location.href = '/login.html';
+    }
+
+    let mode = 'suggest';
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('tabSuggest').classList.toggle('active', m === 'suggest');
+      document.getElementById('tabUpload').classList.toggle('active', m === 'upload');
+      document.getElementById('fileField').style.display = m === 'upload' ? 'block' : 'none';
+      document.getElementById('submitBtn').textContent = m === 'upload' ? 'Submit Upload' : 'Submit Suggestion';
+      hideStatus();
+    }
+
+    function showStatus(msg, isError) {
+      const el = document.getElementById('statusMsg');
+      el.textContent = msg;
+      el.className = 'status-msg ' + (isError ? 'error' : 'ok');
+      el.style.display = 'block';
+    }
+
+    function hideStatus() {
+      document.getElementById('statusMsg').style.display = 'none';
+    }
+
+    async function submitForm() {
+      const title       = document.getElementById('fTitle').value.trim();
+      const description = document.getElementById('fDescription').value.trim();
+      const category     = document.getElementById('fCategory').value.trim();
+      const type         = document.getElementById('fType').value;
+
+      if (!title) {
+        showStatus('Please enter a title.', true);
+        return;
+      }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      hideStatus();
+
+      try {
+        if (mode === 'suggest') {
+          const res = await authFetch('/api/submitsuggestion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, description, category, type })
+          });
+          const data = await res.json();
+          if (data.success) {
+            showStatus('Suggestion submitted! An admin will review it.', false);
+            clearForm();
+            loadMySubmissions();
+          } else {
+            showStatus(data.message || 'Something went wrong.', true);
+          }
+        } else {
+          const fileInput = document.getElementById('fFile');
+          const file = fileInput.files[0];
+          if (!file) {
+            showStatus('Please choose a video file.', true);
+            btn.disabled = false;
+            return;
+          }
+          if (file.size > 200 * 1024 * 1024) {
+            showStatus('File exceeds the 200MB limit.', true);
+            btn.disabled = false;
+            return;
+          }
+
+          const formData = new FormData();
+          formData.append('title', title);
+          formData.append('description', description);
+          formData.append('category', category);
+          formData.append('type', type);
+          formData.append('file', file);
+
+          document.getElementById('progressBar').style.display = 'block';
+
+          await uploadWithProgress('/api/submitupload', formData, function(pct) {
+            document.getElementById('progressFill').style.width = pct + '%';
+          }).then(function(data) {
+            if (data.success) {
+              showStatus('Upload submitted! An admin will review it.', false);
+              clearForm();
+              loadMySubmissions();
+            } else {
+              showStatus(data.message || 'Upload failed.', true);
+            }
+          });
+
+          document.getElementById('progressBar').style.display = 'none';
+        }
+      } catch (err) {
+        showStatus('Network error. Please try again.', true);
+      }
+
+      btn.disabled = false;
+    }
+
+    function uploadWithProgress(url, formData, onProgress) {
+      return new Promise(function(resolve, reject) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+        xhr.upload.onprogress = function(e) {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = function() {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (e) {
+            reject(e);
+          }
+        };
+        xhr.onerror = function() { reject(new Error('Network error')); };
+        xhr.send(formData);
+      });
+    }
+
+    function clearForm() {
+      document.getElementById('fTitle').value = '';
+      document.getElementById('fDescription').value = '';
+      document.getElementById('fCategory').value = '';
+      document.getElementById('fFile').value = '';
+      document.getElementById('progressFill').style.width = '0%';
+    }
+
+    async function loadMySubmissions() {
+      const list = document.getElementById('mySubmissionsList');
+      try {
+        const res  = await authFetch('/api/mysubmissions');
+        const subs = await res.json();
+
+        if (subs.length === 0) {
+          list.innerHTML = '<div class="empty-state">You haven\'t submitted anything yet.</div>';
+          return;
+        }
+
+        let html = '';
+        subs.forEach(function(s) {
+          const icon = s.kind === 'upload' ? '📁' : '💡';
+          html += `
+            <div class="my-sub-item">
+              <div class="my-sub-top">
+                <div class="my-sub-title">${icon} ${escapeHtml(s.title)}</div>
+                <span class="badge ${s.status}">${s.status}</span>
+              </div>
+              ${s.description ? `<div class="my-sub-desc">${escapeHtml(s.description)}</div>` : ''}
+              ${s.admin_note ? `<div class="my-sub-note">Admin note: ${escapeHtml(s.admin_note)}</div>` : ''}
+            </div>
+          `;
+        });
+        list.innerHTML = html;
+      } catch (err) {
+        list.innerHTML = '<div class="empty-state">Couldn\'t load your submissions.</div>';
+      }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+
+    loadMySubmissions();
+  </script>
+
+</body>
+</html>
