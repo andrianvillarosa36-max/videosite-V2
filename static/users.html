@@ -148,13 +148,31 @@
       </div>
 
       <div class="modal-section">
-        <h3>❤️ Their Favorites</h3>
-        <div id="mFavorites"></div>
-      </div>   
+        <h3 onclick="toggleSection('mFavorites')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+          <span>❤️ Their Favorites</span><span id="mFavoritesArrow">▾</span>
+        </h3>
+        <div id="mFavorites" style="display:none;"></div>
+      </div>
 
       <div class="modal-section">
-        <h3>⭐ Their Ratings</h3>
-        <div id="mRatings"></div>
+        <h3 onclick="toggleSection('mRatings')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+          <span>⭐ Their Ratings</span><span id="mRatingsArrow">▾</span>
+        </h3>
+        <div id="mRatings" style="display:none;"></div>
+      </div>
+
+      <div class="modal-section">
+        <h3 onclick="toggleSection('mFavAdult')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+          <span>🔞❤️ Their 18+ Favorites</span><span id="mFavAdultArrow">▾</span>
+        </h3>
+        <div id="mFavAdult" style="display:none;"></div>
+      </div>
+
+      <div class="modal-section">
+        <h3 onclick="toggleSection('mRatingsAdult')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+          <span>🔞⭐ Their 18+ Ratings</span><span id="mRatingsAdultArrow">▾</span>
+        </h3>
+        <div id="mRatingsAdult" style="display:none;"></div>
       </div>
     </div>
   </div>
@@ -214,6 +232,61 @@
       });
     }
 
+const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
+
+    function getVideoId(v) {
+      return v.type === 'series' ? (v.filename || v.title) : v.url;
+    }
+
+    function buildFavGrid(box, favUrls, videos, filterFn) {
+      const matched = videos.filter(function(v) {
+        return filterFn(v) && favUrls.includes(getVideoId(v));
+      });
+      if (matched.length === 0) {
+        box.innerHTML = '<p style="color:#8B949E; font-size:0.8rem;">No favorites yet.</p>';
+        return;
+      }
+      box.innerHTML = '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;"></div>';
+      const grid = box.querySelector('div');
+      matched.forEach(function(v) {
+        const thumbStyle = v.thumb ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;' : '';
+        const div = document.createElement('div');
+        div.style.cssText = 'aspect-ratio:2/3; border-radius:8px; background:#0D1117; ' + thumbStyle + ' position:relative; overflow:hidden;';
+        div.innerHTML = '<div style="position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent,rgba(0,0,0,0.9)); padding:16px 5px 5px;"><div style="color:#fff; font-size:0.6rem; font-weight:600; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">' + v.title + '</div></div>';
+        grid.appendChild(div);
+      });
+    }
+
+    function buildRatingsList(box, ratings, videos, filterFn) {
+      const matched = ratings.filter(function(r) {
+        const v = videos.find(function(vv) { return getVideoId(vv) === r.videoUrl; });
+        return v && filterFn(v);
+      });
+      if (matched.length === 0) {
+        box.innerHTML = '<p style="color:#8B949E; font-size:0.8rem;">No ratings yet.</p>';
+        return;
+      }
+      box.innerHTML = '';
+      matched.forEach(function(r) {
+        const v = videos.find(function(vv) { return getVideoId(vv) === r.videoUrl; });
+        if (!v) return;
+        let stars = '<div class="stars">';
+        for (let i = 1; i <= 5; i++) {
+          stars += '<span class="star ' + (i <= r.rating ? 'filled' : 'empty') + '">★</span>';
+        }
+        stars += '</div>';
+        box.innerHTML += '<div class="rated-card"><div class="rated-title">' + v.title + '</div>' + stars + '</div>';
+      });
+    }
+
+    function toggleSection(id) {
+      const box   = document.getElementById(id);
+      const arrow = document.getElementById(id + 'Arrow');
+      const isHidden = box.style.display === 'none';
+      box.style.display = isHidden ? 'block' : 'none';
+      arrow.textContent = isHidden ? '▴' : '▾';
+    }
+
     async function openProfile(username) {
       const uRes    = await fetch('/api/users');
       const users   = await uRes.json();
@@ -222,55 +295,25 @@
       const ratings = await rRes.json();
       const vRes    = await fetch('/api/videos');
       const videos  = await vRes.json();
+      const favRes  = await fetch('/api/favorites?username=' + username);
+      const favData = await favRes.json();
+      const favUrls = favData.map(f => f.videoUrl);
 
       document.getElementById('mAvatar').textContent = u.avatar || '😀';
       document.getElementById('mName').textContent   = u.username;
       document.getElementById('mRole').textContent   = u.role;
       document.getElementById('mBio').textContent    = u.bio || 'No bio yet.';
 
-      const favRes  = await fetch('/api/favorites?username=' + username);
-      const favData = await favRes.json();
-      const favUrls = favData.map(f => f.videoUrl);
-      const favBox  = document.getElementById('mFavorites');
-
-      if (favUrls.length === 0) {
-        favBox.innerHTML = '<p style="color:#8B949E; font-size:0.8rem;">No favorites yet.</p>';
-      } else {
-        favBox.innerHTML = '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;"></div>';
-        const favGrid = favBox.querySelector('div');
-        videos.filter(v => favUrls.includes(v.url || v.filename)).forEach(function(v) {
-          const thumbStyle = v.thumb ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;' : '';
-          const div = document.createElement('div');
-          div.style.cssText = 'aspect-ratio:2/3; border-radius:8px; background:#0D1117; ' + thumbStyle + ' position:relative; overflow:hidden;';
-          div.innerHTML = '<div style="position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent,rgba(0,0,0,0.9)); padding:16px 5px 5px;"><div style="color:#fff; font-size:0.6rem; font-weight:600; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">' + v.title + '</div></div>';
-          favGrid.appendChild(div);
-        });
-      }
-
       const myRatings = ratings.filter(r => r.username === username);
-      const rBox      = document.getElementById('mRatings');
 
-      if (myRatings.length === 0) {
-        rBox.innerHTML = '<p style="color:#8B949E; font-size:0.8rem;">No ratings yet.</p>';
-      } else {
-        rBox.innerHTML = '';
-        myRatings.forEach(r => {
-          const v = videos.find(v => v.url === r.videoUrl);
-          if (!v) return;
-          let stars = '<div class="stars">';
-          for (let i = 1; i <= 5; i++) {
-            stars += `<span class="star ${i <= r.rating ? 'filled' : 'empty'}">★</span>`;
-          }
-          stars += '</div>';
-          rBox.innerHTML += `
-            <div class="rated-card">
-              <div class="rated-title">${v.title}</div>
-              ${stars}
-            </div>
-          `;
-        });
-      }
+      buildFavGrid(document.getElementById('mFavorites'), favUrls, videos, function(v) { return !adultCategories.includes(v.category); });
+      buildFavGrid(document.getElementById('mFavAdult'), favUrls, videos, function(v) { return adultCategories.includes(v.category); });
+      buildRatingsList(document.getElementById('mRatings'), myRatings, videos, function(v) { return !adultCategories.includes(v.category); });
+      buildRatingsList(document.getElementById('mRatingsAdult'), myRatings, videos, function(v) { return adultCategories.includes(v.category); });
+      
 
+      document.getElementById('modalOverlay').classList.add('open');
+    }
       document.getElementById('modalOverlay').classList.add('open');
     }
 
