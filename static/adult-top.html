@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Top Videos — VideoSite</title>
+  <title>18+ Top Videos</title>
   <link rel="stylesheet" href="/style.css" />
   <style>
     .tabs {
@@ -29,14 +29,12 @@
     }
 
     .tab-btn.active {
-      background: var(--accent);
-      border-color: var(--accent);
+      background: #ff4477;
+      border-color: #ff4477;
       color: #000;
     }
 
-    .leaderboard {
-      padding: 12px;
-    }
+    .leaderboard { padding: 12px; }
 
     .rank-row {
       display: flex;
@@ -97,11 +95,24 @@
 </head>
 <body>
 
+  <!-- AGE GATE CHECK -->
+  <div id="ageGateOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:999; align-items:center; justify-content:center;">
+    <div style="background:#1C2333; border:1px solid #30363D; border-radius:14px; padding:28px 24px; max-width:340px; text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:12px;">🔞</div>
+      <p style="font-size:1.1rem; font-weight:700; margin-bottom:10px;">Are you 18 or older?</p>
+      <p style="font-size:0.8rem; color:#8B949E; margin-bottom:20px;">This section contains adult content not suitable for minors.</p>
+      <div style="display:flex; gap:10px;">
+        <button onclick="window.location.href='/index.html'" style="flex:1; background:#1C2333; border:1px solid #30363D; color:#fff; border-radius:8px; padding:12px; font-size:0.9rem; cursor:pointer;">No</button>
+        <button onclick="confirmAndStay()" style="flex:1; background:#00D4FF; border:none; color:#000; border-radius:8px; padding:12px; font-size:0.9rem; font-weight:700; cursor:pointer;">Yes, I'm 18+</button>
+      </div>
+    </div>
+  </div>
+
   <!-- NAVBAR -->
   <nav>
-    <div class="logo">🏆 Top Videos</div>
+    <div class="logo" style="color:#ff4477;">🔞 18+ Top Videos</div>
     <div class="nav-right">
-      <a href="/index.html" style="color:var(--accent); font-size:0.82rem; text-decoration:none;">❌ Return</a>
+      <a href="/adult.html" style="color:#00D4FF; font-size:0.82rem; text-decoration:none;">🔞 18+ Corner</a>
       <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
   </nav>
@@ -114,11 +125,9 @@
     <button class="tab-btn" id="tab-leastpopular" onclick="setTab('leastpopular')">📉 Least Popular</button>
   </div>
 
-  <!-- LEADERBOARD -->
   <div class="leaderboard" id="leaderboard"></div>
 
   <script>
-    // Apply saved theme on load
     (function() {
       const themes = {
         dark:       { bg:'#0D1117', card:'#1C2333', text:'#ffffff', border:'#30363D', muted:'#8B949E', accent:'#00D4FF' },
@@ -130,30 +139,47 @@
       };
       const name = localStorage.getItem('theme') || 'dark';
       const t = themes[name];
-      document.documentElement.style.setProperty('--bg',     t.bg);
-      document.documentElement.style.setProperty('--card',   t.card);
-      document.documentElement.style.setProperty('--text',   t.text);
+      document.documentElement.style.setProperty('--bg', t.bg);
+      document.documentElement.style.setProperty('--card', t.card);
+      document.documentElement.style.setProperty('--text', t.text);
       document.documentElement.style.setProperty('--border', t.border);
-      document.documentElement.style.setProperty('--muted',  t.muted);
+      document.documentElement.style.setProperty('--muted', t.muted);
       document.documentElement.style.setProperty('--accent', t.accent);
       document.body.style.background = t.bg;
-      document.body.style.color      = t.text;
+      document.body.style.color = t.text;
     })();
 
     const user = JSON.parse(sessionStorage.getItem('user') || 'null');
     if (!user) window.location.href = '/login.html';
+
+    const token = sessionStorage.getItem('token');
+    function authFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, options);
+    }
+
+    if (sessionStorage.getItem('ageVerified') !== 'true') {
+      document.getElementById('ageGateOverlay').style.display = 'flex';
+    }
+
+    function confirmAndStay() {
+      sessionStorage.setItem('ageVerified', 'true');
+      document.getElementById('ageGateOverlay').style.display = 'none';
+    }
+
+    const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
 
     let allVideos  = [];
     let allRatings = [];
     let allLikes   = [];
     let currentTab = 'toprated';
 
-    const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
-
     async function loadData() {
       const vRes = await fetch('/api/videos');
       const all  = await vRes.json();
-      allVideos  = all.filter(function(v) { return !adultCategories.includes(v.category); });
+      allVideos  = all.filter(function(v) { return adultCategories.includes(v.category); });
       const rRes = await fetch('/api/ratings');
       allRatings = await rRes.json();
       const lRes = await fetch('/api/likes');
@@ -248,7 +274,9 @@
     }
 
     function logout() {
+      authFetch('/api/logout', { method: 'POST' }).catch(function() {});
       sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
       window.location.href = '/login.html';
     }
 
