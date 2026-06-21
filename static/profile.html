@@ -207,16 +207,22 @@
     <button class="save-btn" onclick="saveProfile()">Save Profile</button>
   </div>
 
-  <!-- MAIN SITE TOP RATED -->
+  <!-- MAIN SITE RATINGS -->
   <div class="section">
-    <h2 id="topRatedHeading">⭐ Main Site Top Rated Videos</h2>
-    <div id="topRated"></div>
+    <h2 id="topRatedHeading" onclick="toggleSection('topRated')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+      <span>⭐ My Ratings</span>
+      <span id="topRatedArrow">▾</span>
+    </h2>
+    <div id="topRated" style="display:none;"></div>
   </div>
 
   <!-- 18+ CORNER RATINGS -->
   <div class="section">
-    <h2 id="myRatingsHeading">🔞 18+ Corner Ratings</h2>
-    <div id="myRatings"></div>
+    <h2 id="myRatingsHeading" onclick="toggleSection('myRatings')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+      <span>🔞 My 18+ Corner Ratings</span>
+      <span id="myRatingsArrow">▾</span>
+    </h2>
+    <div id="myRatings" style="display:none;"></div>
   </div>
 
   <script>
@@ -262,8 +268,8 @@
     let selectedAvatar = loggedInUser.avatar || '😀';
 
     // Update Headings Dynamically based on context
-    document.getElementById('topRatedHeading').textContent = isOwnProfile ? "⭐ My Main Site Top Rated Videos" : `⭐ ${targetUsername}'s Main Site Top Rated Videos`;
-    document.getElementById('myRatingsHeading').textContent = isOwnProfile ? "🔞 My 18+ Corner Ratings" : `🔞 ${targetUsername}'s 18+ Corner Ratings`;
+    document.querySelector('#topRatedHeading span').textContent = isOwnProfile ? "⭐ My Ratings" : `⭐ ${targetUsername}'s Ratings`;
+    document.querySelector('#myRatingsHeading span').textContent = isOwnProfile ? "🔞 My 18+ Corner Ratings" : `🔞 ${targetUsername}'s 18+ Corner Ratings`;
     
     // Hide edit button if looking at someone else's profile page
     if (!isOwnProfile) {
@@ -395,8 +401,7 @@
           };
         })
         .filter(v => v.title) // Ensure structural safety if a video was purged from endpoints
-        .sort((a, b) => b.personalScore - a.personalScore) // Top scores rank highest
-        .slice(0, 3); // Grab the top 3 highest rated elements 
+        .sort((a, b) => b.personalScore - a.personalScore); // Show all ratings, highest first
 
       box.innerHTML = '';
       ranked.forEach(v => {
@@ -455,6 +460,14 @@
       if (renderedCount === 0) {
         box.innerHTML = `<p style="color:#8B949E;">No historical data compiled.</p>`;
       }
+    }
+
+    function toggleSection(id) {
+      const box   = document.getElementById(id);
+      const arrow = document.getElementById(id + 'Arrow');
+      const isHidden = box.style.display === 'none';
+      box.style.display = isHidden ? 'block' : 'none';
+      arrow.textContent = isHidden ? '▴' : '▾';
     }
 
     function logout() {
