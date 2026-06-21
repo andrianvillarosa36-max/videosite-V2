@@ -238,6 +238,9 @@
               mediaInfo = `<p class="video-file">${s.catbox_url}</p>`;
             }
           }
+          const thumbInfo = s.thumb
+            ? `<img src="${s.thumb}" style="width:60px; height:34px; object-fit:cover; border-radius:4px; margin-top:6px; display:block;" onerror="this.style.display='none'" />`
+            : '';
 
           const actions = s.status === 'pending'
             ? `
@@ -258,6 +261,7 @@
                 <p class="video-title">${icon} ${escapeHtmlAdmin(s.title)} <span style="color:#8B949E; font-size:0.72rem;">(${typeLabel} · by ${escapeHtmlAdmin(s.username)})</span></p>
                 ${s.description ? `<p class="video-file">${escapeHtmlAdmin(s.description)}</p>` : ''}
                 ${mediaInfo}
+                ${thumbInfo}
                 ${actions}
               </div>
             </div>

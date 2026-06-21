@@ -208,6 +208,11 @@
       </div>
 
       <div class="field">
+        <label>Thumbnail URL (optional)</label>
+        <input type="text" id="fThumb" placeholder="https://... (from catbox.moe or any image host)" />
+      </div>
+
+      <div class="field">
         <label>Type</label>
         <select id="fType" onchange="onTypeChange()">
           <option value="video">Movie / Single Video</option>
@@ -330,11 +335,13 @@
       hideStatus();
 
       try {
+        const thumb = document.getElementById('fThumb').value.trim();
+
         if (mode === 'suggest') {
           const res = await authFetch('/api/submitsuggestion', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, description, category, type })
+            body: JSON.stringify({ title, description, category, type, thumb })
           });
           const data = await res.json();
           if (data.success) {
@@ -350,6 +357,7 @@
           formData.append('description', description);
           formData.append('category', category);
           formData.append('type', type);
+          formData.append('thumb', thumb);
 
           if (type === 'series') {
             const fileInputs = document.querySelectorAll('[data-ep-file]');
@@ -437,6 +445,7 @@
       document.getElementById('fTitle').value = '';
       document.getElementById('fDescription').value = '';
       document.getElementById('fCategory').value = '';
+      document.getElementById('fThumb').value = '';
       document.getElementById('fFile').value = '';
       document.getElementById('progressFill').style.width = '0%';
       document.getElementById('episodeList').innerHTML = '';

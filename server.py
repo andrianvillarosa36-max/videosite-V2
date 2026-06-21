@@ -788,6 +788,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             description = body.get('description', '').strip()
             category = body.get('category', '')
             vtype = body.get('type', 'video')
+            thumb = body.get('thumb', '').strip()
 
             if not title:
                 self.send_json({'success': False, 'message': 'Title is required.'})
@@ -795,9 +796,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
             with db_cursor() as (conn, cur):
                 cur.execute(
-                    '''INSERT INTO submissions (username, kind, title, description, category, type, status)
-                       VALUES (%s, 'suggestion', %s, %s, %s, %s, 'pending')''',
-                    (session['username'], title, description, category, vtype)
+                    '''INSERT INTO submissions (username, kind, title, description, category, type, thumb, status)
+                       VALUES (%s, 'suggestion', %s, %s, %s, %s, %s, 'pending')''',
+                    (session['username'], title, description, category, vtype, thumb)
                 )
             self.send_json({'success': True})
 
@@ -827,6 +828,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             description = fields.get('description', '').strip()
             category = fields.get('category', '')
             vtype = fields.get('type', 'video')
+            thumb = fields.get('thumb', '').strip()
 
             if not title:
                 self.send_json({'success': False, 'message': 'Title is required.'})
@@ -847,18 +849,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         episodes.append({'title': ep_title, 'url': url})
                     with db_cursor() as (conn, cur):
                         cur.execute(
-                            '''INSERT INTO submissions (username, kind, title, description, category, type, episodes, status)
-                               VALUES (%s, 'upload', %s, %s, %s, 'series', %s, 'pending')''',
-                            (session['username'], title, description, category, json.dumps(episodes))
+                            '''INSERT INTO submissions (username, kind, title, description, category, type, episodes, thumb, status)
+                               VALUES (%s, 'upload', %s, %s, %s, 'series', %s, %s, 'pending')''',
+                            (session['username'], title, description, category, json.dumps(episodes), thumb)
                         )
                 else:
                     f = files[0]
                     catbox_url = upload_to_catbox(f['filename'], f['body'])
                     with db_cursor() as (conn, cur):
                         cur.execute(
-                            '''INSERT INTO submissions (username, kind, title, description, category, type, catbox_url, status)
-                               VALUES (%s, 'upload', %s, %s, %s, %s, %s, 'pending')''',
-                            (session['username'], title, description, category, vtype, catbox_url)
+                            '''INSERT INTO submissions (username, kind, title, description, category, type, catbox_url, thumb, status)
+                               VALUES (%s, 'upload', %s, %s, %s, %s, %s, %s, 'pending')''',
+                            (session['username'], title, description, category, vtype, catbox_url, thumb)
                         )
             except Exception as e:
                 print(f'Catbox upload error: {e}')
@@ -898,8 +900,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if sub['kind'] == 'upload' and sub['type'] == 'series' and sub['episodes']:
                     cur.execute(
                         '''INSERT INTO videos (title, filename, thumb, category, type, episodes)
-                           VALUES (%s, %s, '', %s, 'series', %s)''',
-                        (sub['title'], sub['title'], sub['category'], json.dumps(sub['episodes']))
+                           VALUES (%s, %s, %s, %s, 'series', %s)''',
+                        (sub['title'], sub['title'], sub.get('thumb', ''), sub['category'], json.dumps(sub['episodes']))
                     )
                     cur.execute(
                         'UPDATE submissions SET status = %s, admin_note = %s WHERE id = %s',
@@ -910,8 +912,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     filename = sub['catbox_url'].split('/')[-1]
                     cur.execute(
                         '''INSERT INTO videos (title, filename, url, thumb, category, type)
-                           VALUES (%s, %s, %s, '', %s, %s)''',
-                        (sub['title'], filename, sub['catbox_url'], sub['category'], sub['type'])
+                           VALUES (%s, %s, %s, %s, %s, %s)''',
+                        (sub['title'], filename, sub['catbox_url'], sub.get('thumb', ''), sub['category'], sub['type'])
                     )
                     cur.execute(
                         'UPDATE submissions SET status = %s, admin_note = %s WHERE id = %s',
