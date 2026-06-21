@@ -209,18 +209,26 @@
 
       <div class="field">
         <label>Type</label>
-        <select id="fType">
+        <select id="fType" onchange="onTypeChange()">
           <option value="video">Movie / Single Video</option>
           <option value="series">Series</option>
         </select>
       </div>
 
-      <div class="field" id="fileField" style="display:none;">
+      <div class="field" id="fileFieldSingle" style="display:none;">
         <label>Video File (max 200MB)</label>
         <input type="file" id="fFile" accept="video/*" />
         <div class="hint">Large files may take a while to upload, especially on mobile data.</div>
-        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
       </div>
+
+      <div class="field" id="fileFieldSeries" style="display:none;">
+        <label>Episodes</label>
+        <div id="episodeList"></div>
+        <button type="button" onclick="addEpisodeRow()" style="width:100%; background:var(--bg); border:1px dashed var(--border); color:var(--accent); border-radius:8px; padding:10px; font-size:0.82rem; cursor:pointer; margin-top:6px;">+ Add Episode</button>
+        <div class="hint">Each episode file max 200MB. Large batches may take a while to upload.</div>
+      </div>
+
+      <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
 
       <div class="status-msg" id="statusMsg"></div>
 
@@ -261,9 +269,34 @@
       mode = m;
       document.getElementById('tabSuggest').classList.toggle('active', m === 'suggest');
       document.getElementById('tabUpload').classList.toggle('active', m === 'upload');
-      document.getElementById('fileField').style.display = m === 'upload' ? 'block' : 'none';
       document.getElementById('submitBtn').textContent = m === 'upload' ? 'Submit Upload' : 'Submit Suggestion';
       hideStatus();
+      onTypeChange();
+    }
+
+    function onTypeChange() {
+      const type = document.getElementById('fType').value;
+      const showFiles = mode === 'upload';
+      document.getElementById('fileFieldSingle').style.display = (showFiles && type === 'video') ? 'block' : 'none';
+      document.getElementById('fileFieldSeries').style.display = (showFiles && type === 'series') ? 'block' : 'none';
+      if (showFiles && type === 'series' && document.getElementById('episodeList').children.length === 0) {
+        addEpisodeRow();
+      }
+    }
+
+    let episodeCount = 0;
+
+    function addEpisodeRow() {
+      const list = document.getElementById('episodeList');
+      const idx = episodeCount++;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; gap:6px; margin-bottom:8px; align-items:center;';
+      row.innerHTML = `
+        <input type="text" placeholder="Episode ${idx + 1} title" data-ep-title="${idx}" style="flex:1; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:9px 11px; color:var(--text); font-size:0.8rem;" />
+        <input type="file" accept="video/*" data-ep-file="${idx}" style="flex:1.4; font-size:0.72rem; color:var(--muted);" />
+        <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:#ff4477; font-size:1.1rem; cursor:pointer; padding:4px 8px;">✕</button>
+      `;
+      list.appendChild(row);
     }
 
     function showStatus(msg, isError) {
@@ -308,25 +341,50 @@
             showStatus(data.message || 'Something went wrong.', true);
           }
         } else {
-          const fileInput = document.getElementById('fFile');
-          const file = fileInput.files[0];
-          if (!file) {
-            showStatus('Please choose a video file.', true);
-            btn.disabled = false;
-            return;
-          }
-          if (file.size > 200 * 1024 * 1024) {
-            showStatus('File exceeds the 200MB limit.', true);
-            btn.disabled = false;
-            return;
-          }
-
           const formData = new FormData();
           formData.append('title', title);
           formData.append('description', description);
           formData.append('category', category);
           formData.append('type', type);
-          formData.append('file', file);
+
+          if (type === 'series') {
+            const fileInputs = document.querySelectorAll('[data-ep-file]');
+            const titleInputs = document.querySelectorAll('[data-ep-title]');
+            let hasFile = false;
+
+            for (let i = 0; i < fileInputs.length; i++) {
+              const f = fileInputs[i].files[0];
+              if (!f) continue;
+              hasFile = true;
+              if (f.size > 200 * 1024 * 1024) {
+                showStatus(`"${f.name}" exceeds the 200MB limit.`, true);
+                btn.disabled = false;
+                return;
+              }
+              const fieldName = 'episode_' + i;
+              formData.append(fieldName, f);
+              formData.append('ep_title_' + fieldName, titleInputs[i].value.trim() || ('Episode ' + (i + 1)));
+            }
+
+            if (!hasFile) {
+              showStatus('Please add at least one episode file.', true);
+              btn.disabled = false;
+              return;
+            }
+          } else {
+            const file = document.getElementById('fFile').files[0];
+            if (!file) {
+              showStatus('Please choose a video file.', true);
+              btn.disabled = false;
+              return;
+            }
+            if (file.size > 200 * 1024 * 1024) {
+              showStatus('File exceeds the 200MB limit.', true);
+              btn.disabled = false;
+              return;
+            }
+            formData.append('file', file);
+          }
 
           document.getElementById('progressBar').style.display = 'block';
 
@@ -377,6 +435,9 @@
       document.getElementById('fCategory').value = '';
       document.getElementById('fFile').value = '';
       document.getElementById('progressFill').style.width = '0%';
+      document.getElementById('episodeList').innerHTML = '';
+      episodeCount = 0;
+      if (document.getElementById('fType').value === 'series') addEpisodeRow();
     }
 
     async function loadMySubmissions() {

@@ -133,16 +133,19 @@ def parse_multipart_stream(rfile, content_type, content_length, max_size):
     data = rfile.read(content_length)
     parts = data.split(b'--' + boundary)
     fields = {}
+    files = []
     for part in parts[1:-1]:
         header, _, body = part[2:].partition(b'\r\n\r\n')
         header = header.decode(errors='ignore')
         body = body.rstrip(b'\r\n')
         if 'filename="' in header:
             filename = header.split('filename="')[1].split('"')[0]
-            fields['file'] = (filename, body)
+            name = header.split('name="')[1].split('"')[0] if 'name="' in header else 'file'
+            files.append({'field': name, 'filename': filename, 'body': body})
         elif 'name="' in header:
             name = header.split('name="')[1].split('"')[0]
             fields[name] = body.decode(errors='ignore')
+    fields['_files'] = files
     return fields
 
 def upload_to_catbox(filename, file_bytes):
@@ -807,15 +810,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({'success': False, 'message': 'Invalid upload format.'})
                 return
 
-            MAX_UPLOAD_SIZE = 200 * 1024 * 1024  # 200MB
+            MAX_UPLOAD_SIZE = 200 * 1024 * 1024 * 10  # raised cap for multi-episode batches; each file still checked individually below
 
             try:
                 fields = parse_multipart_stream(self.rfile, content_type, length, MAX_UPLOAD_SIZE)
             except ValueError:
-                self.send_json({'success': False, 'message': 'File exceeds the 200MB limit.'})
+                self.send_json({'success': False, 'message': 'Upload exceeds the size limit.'})
                 return
 
-            if 'file' not in fields:
+            files = fields.get('_files', [])
+            if not files:
                 self.send_json({'success': False, 'message': 'No file provided.'})
                 return
 
@@ -828,21 +832,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({'success': False, 'message': 'Title is required.'})
                 return
 
-            filename, file_bytes = fields['file']
+            PER_FILE_LIMIT = 200 * 1024 * 1024
+            for f in files:
+                if len(f['body']) > PER_FILE_LIMIT:
+                    self.send_json({'success': False, 'message': f"\"{f['filename']}\" exceeds the 200MB per-file limit."})
+                    return
 
             try:
-                catbox_url = upload_to_catbox(filename, file_bytes)
+                if vtype == 'series':
+                    episodes = []
+                    for i, f in enumerate(files):
+                        ep_title = fields.get(f"ep_title_{f['field']}", f"Episode {i + 1}")
+                        url = upload_to_catbox(f['filename'], f['body'])
+                        episodes.append({'title': ep_title, 'url': url})
+                    with db_cursor() as (conn, cur):
+                        cur.execute(
+                            '''INSERT INTO submissions (username, kind, title, description, category, type, episodes, status)
+                               VALUES (%s, 'upload', %s, %s, %s, 'series', %s, 'pending')''',
+                            (session['username'], title, description, category, json.dumps(episodes))
+                        )
+                else:
+                    f = files[0]
+                    catbox_url = upload_to_catbox(f['filename'], f['body'])
+                    with db_cursor() as (conn, cur):
+                        cur.execute(
+                            '''INSERT INTO submissions (username, kind, title, description, category, type, catbox_url, status)
+                               VALUES (%s, 'upload', %s, %s, %s, %s, %s, 'pending')''',
+                            (session['username'], title, description, category, vtype, catbox_url)
+                        )
             except Exception as e:
                 print(f'Catbox upload error: {e}')
-                self.send_json({'success': False, 'message': 'Upload failed. Try a smaller file or check your connection.'})
+                self.send_json({'success': False, 'message': 'Upload failed. Try smaller files or check your connection.'})
                 return
 
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    '''INSERT INTO submissions (username, kind, title, description, category, type, catbox_url, status)
-                       VALUES (%s, 'upload', %s, %s, %s, %s, %s, 'pending')''',
-                    (session['username'], title, description, category, vtype, catbox_url)
-                )
             self.send_json({'success': True})
 
         elif path == '/api/reviewsubmission':
@@ -873,7 +895,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     return
 
                 # approve
-                if sub['kind'] == 'upload' and sub['catbox_url']:
+                if sub['kind'] == 'upload' and sub['type'] == 'series' and sub['episodes']:
+                    cur.execute(
+                        '''INSERT INTO videos (title, filename, thumb, category, type, episodes)
+                           VALUES (%s, %s, '', %s, 'series', %s)''',
+                        (sub['title'], sub['title'], sub['category'], json.dumps(sub['episodes']))
+                    )
+                    cur.execute(
+                        'UPDATE submissions SET status = %s, admin_note = %s WHERE id = %s',
+                        ('approved', admin_note, sub_id)
+                    )
+                    self.send_json({'success': True})
+                elif sub['kind'] == 'upload' and sub['catbox_url']:
                     filename = sub['catbox_url'].split('/')[-1]
                     cur.execute(
                         '''INSERT INTO videos (title, filename, url, thumb, category, type)
