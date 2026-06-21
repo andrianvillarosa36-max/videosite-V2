@@ -207,16 +207,22 @@
     <button class="save-btn" onclick="saveProfile()">Save Profile</button>
   </div>
 
-  <!-- PERSONAL TOP RATED VIDEOS -->
+  <!-- MAIN SITE TOP RATED -->
   <div class="section">
-    <h2 id="topRatedHeading">⭐ Top Rated Videos</h2>
+    <h2 id="topRatedHeading">⭐ Main Site Top Rated Videos</h2>
     <div id="topRated"></div>
   </div>
 
-  <!-- MY RATINGS (ALL HIERARCHY) -->
+  <!-- 18+ CORNER RATINGS -->
   <div class="section">
-    <h2 id="myRatingsHeading">🎬 All Rated Videos</h2>
+    <h2 id="myRatingsHeading">🔞 18+ Corner Ratings</h2>
     <div id="myRatings"></div>
+  </div>
+
+  <!-- 18+ CORNER FAVORITES -->
+  <div class="section">
+    <h2 id="myFavAdultHeading">🔞❤️ 18+ Corner Favorites</h2>
+    <div id="myFavAdult"></div>
   </div>
 
   <script>
@@ -262,8 +268,8 @@
     let selectedAvatar = loggedInUser.avatar || '😀';
 
     // Update Headings Dynamically based on context
-    document.getElementById('topRatedHeading').textContent = isOwnProfile ? "⭐ My Top Rated Videos" : `⭐ ${targetUsername}'s Top Rated Videos`;
-    document.getElementById('myRatingsHeading').textContent = isOwnProfile ? "🎬 All My Rated Videos" : `🎬 All of ${targetUsername}'s Rated Videos`;
+    document.getElementById('topRatedHeading').textContent = isOwnProfile ? "⭐ My Main Site Top Rated Videos" : `⭐ ${targetUsername}'s Main Site Top Rated Videos`;
+    document.getElementById('myRatingsHeading').textContent = isOwnProfile ? "🔞 My 18+ Corner Ratings" : `🔞 ${targetUsername}'s 18+ Corner Ratings`;
     
     // Hide edit button if looking at someone else's profile page
     if (!isOwnProfile) {
@@ -363,6 +369,8 @@
     }
 
     // MODIFIED: Calculates high-score rankings restricted exclusively to this user's dataset
+    const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
+
     async function loadTopRated() {
       const res     = await fetch('/api/ratings');
       const ratings = await res.json();
@@ -370,8 +378,13 @@
       const videos  = await vRes.json();
       const box     = document.getElementById('topRated');
 
-      // Filter global telemetry down to only the profile target's interactions
-      const targetRatings = ratings.filter(r => r.username === targetUsername);
+      // Filter global telemetry down to only the profile target's interactions,
+      // and only ratings on non-adult (main site) videos
+      const targetRatings = ratings.filter(r => {
+        if (r.username !== targetUsername) return false;
+        const v = videos.find(vv => (vv.type === 'series' ? vv.filename : vv.url) === r.videoUrl);
+        return v && !adultCategories.includes(v.category);
+      });
 
       if (targetRatings.length === 0) {
         box.innerHTML = `<p style="color:#8B949E;">No high ratings registered yet.</p>`;
@@ -416,7 +429,12 @@
       const videos  = await vRes.json();
       const box     = document.getElementById('myRatings');
 
-      const mine = ratings.filter(r => r.username === targetUsername);
+      // Only ratings on adult (18+ Corner) videos
+      const mine = ratings.filter(r => {
+        if (r.username !== targetUsername) return false;
+        const v = videos.find(vv => (vv.type === 'series' ? vv.filename : vv.url) === r.videoUrl);
+        return v && adultCategories.includes(v.category);
+      });
 
       if (mine.length === 0) {
         box.innerHTML = `<p style="color:#8B949E;">No interactions found.</p>`;
@@ -445,6 +463,36 @@
       }
     }
 
+    async function loadAdultFavorites() {
+      const box = document.getElementById('myFavAdult');
+      document.getElementById('myFavAdultHeading').textContent = isOwnProfile ? "🔞❤️ My 18+ Corner Favorites" : `🔞❤️ ${targetUsername}'s 18+ Corner Favorites`;
+
+      const fRes    = await fetch('/api/favorites?username=' + targetUsername);
+      const favData = await fRes.json();
+      const vRes    = await fetch('/api/videos');
+      const videos  = await vRes.json();
+
+      const favVideos = videos.filter(function(v) {
+        const id = v.type === 'series' ? (v.filename || v.title) : v.url;
+        return adultCategories.includes(v.category) && favData.some(function(f) { return f.videoUrl === id; });
+      });
+
+      if (favVideos.length === 0) {
+        box.innerHTML = '<p style="color:#8B949E;">No 18+ favorites yet.</p>';
+        return;
+      }
+
+      box.innerHTML = '';
+      favVideos.forEach(function(v) {
+        box.innerHTML += `
+          <div class="rated-card">
+            <div class="rated-title">${escapeHTML(v.title)}</div>
+            <div class="rated-category">${escapeHTML(v.category || 'Uncategorized')}</div>
+          </div>
+        `;
+      });
+    }
+
     function logout() {
       authFetch('/api/logout', { method: 'POST' }).catch(function() {});
       sessionStorage.removeItem('user');
@@ -455,6 +503,7 @@
     renderProfile();
     loadTopRated();
     loadMyRatings();
+    loadAdultFavorites();
   </script>
 
 </body>
