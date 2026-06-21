@@ -93,6 +93,20 @@
         <p style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">📺 Episodes</p>
         <div id="episodeList"></div>
       </div>
+
+      <!-- COMMENTS -->
+      <div style="margin-top:16px;">
+        <p style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">💬 Comments</p>
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <input type="text" id="commentInputAdult" placeholder="Add a comment..."
+            style="flex:1; background:#1C2333; border:1px solid #30363D; border-radius:999px; padding:10px 14px; color:#fff; font-size:0.85rem; outline:none;" />
+          <button onclick="postCommentAdult()" style="background:#ff4477; color:#000; border:none; border-radius:999px; padding:10px 18px; font-size:0.85rem; font-weight:700; cursor:pointer; width:auto;">Post</button>
+        </div>
+        <div id="commentListAdult"></div>
+      </div>
+
+      <p style="font-size:0.9rem; font-weight:700; margin-top:16px; margin-bottom:10px;">More like this</p>
+      <div id="relatedVideosAdult" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;"></div>
     </div>
   </div>
 
@@ -305,6 +319,31 @@
       const videoEl = document.getElementById('videoPlayer');
       videoEl.src   = url;
       setupCustomPlayer();
+
+      // Resume from last position
+      const prog = allProgress.find(function(p) { return p.videoUrl === url; });
+      if (prog && !prog.watched && prog.current > 10) {
+        videoEl.addEventListener('loadedmetadata', function() {
+          videoEl.currentTime = prog.current;
+        }, { once: true });
+      }
+
+      // Save progress every 5 seconds
+      if (window._progressTimerAdult) clearInterval(window._progressTimerAdult);
+      window._progressTimerAdult = setInterval(async function() {
+        if (videoEl.duration && videoEl.currentTime > 0) {
+          const isWatched = (videoEl.currentTime / videoEl.duration) >= 0.9;
+          await authFetch('/api/saveprogress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoUrl: url, current: videoEl.currentTime, duration: videoEl.duration, watched: isWatched })
+          });
+          if (isWatched) {
+            clearInterval(window._progressTimerAdult);
+            loadVideos();
+          }
+        }
+      }, 5000);
       document.getElementById('playerTitle').textContent = title;
       authFetch('/api/addview', {
         method: 'POST',
@@ -346,6 +385,32 @@
       document.getElementById('filterBar').style.display      = 'none';
       document.getElementById('playerSection').style.display  = 'block';
       window.scrollTo(0, 0);
+
+      window._currentVideoUrlAdult = url;
+      loadCommentsAdult(url);
+
+      // Related videos (same category, within adult section)
+      const related = document.getElementById('relatedVideosAdult');
+      related.innerHTML = '';
+      const similar = allVideos.filter(function(v2) {
+        const v2Id = v2.type === 'series' ? (v2.filename || v2.title) : v2.url;
+        return v2Id !== url && v2.category === category;
+      });
+      if (similar.length === 0) {
+        related.innerHTML = '<p style="color:#8B949E; font-size:0.78rem; grid-column:1/-1;">No similar videos found.</p>';
+      } else {
+        similar.forEach(function(v2) {
+          const thumbStyle2 = v2.thumb ? 'background-image:url(' + v2.thumb + '); background-size:cover; background-position:center;' : '';
+          const div = document.createElement('div');
+          div.className = 'video-card';
+          div.innerHTML = '<div class="thumbnail" style="' + thumbStyle2 + '"><div class="thumb-overlay"><div class="thumb-title">' + v2.title + '</div></div></div>';
+          div.addEventListener('click', function() {
+            if (v2.type === 'series') openSeriesAdult(v2);
+            else playVideoAdult(v2.url, v2.title, v2.category, v2.tags);
+          });
+          related.appendChild(div);
+        });
+      }
     }
 
     function openSeriesAdult(v) {
@@ -425,7 +490,60 @@
         heartHtml + starsHtml;
     }
 
+    function buildCommentRowAdult(c) {
+      const isMine = c.username === user.username;
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex; gap:10px; margin-bottom:14px;';
+      div.innerHTML =
+        '<div style="width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,#ff4477,#aa0044); display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0;">' + (c.avatar || '😀') + '</div>' +
+        '<div style="flex:1;">' +
+          '<div style="display:flex; align-items:center; gap:8px;">' +
+            '<span style="font-size:0.82rem; font-weight:700;">' + c.username + '</span>' +
+            '<span style="font-size:0.68rem; color:#8B949E;">' + c.time + '</span>' +
+          '</div>' +
+          '<div style="font-size:0.82rem; margin-top:2px;">' + c.text + '</div>' +
+          (isMine ? '<button onclick="deleteCommentAdult(\'' + c.id + '\')" style="background:none; border:none; color:#ff6666; font-size:0.7rem; cursor:pointer; padding:0; margin-top:4px; width:auto;">🗑 Delete</button>' : '') +
+        '</div>';
+      return div;
+    }
+
+    async function loadCommentsAdult(videoUrl) {
+      const res      = await fetch('/api/comments?videoUrl=' + encodeURIComponent(videoUrl));
+      const comments = await res.json();
+      const list     = document.getElementById('commentListAdult');
+      list.innerHTML = '';
+      if (comments.length === 0) {
+        list.innerHTML = '<p style="color:#8B949E; font-size:0.8rem;">No comments yet. Be the first!</p>';
+        return;
+      }
+      comments.forEach(function(c) { list.appendChild(buildCommentRowAdult(c)); });
+    }
+
+    async function postCommentAdult() {
+      const input = document.getElementById('commentInputAdult');
+      const text  = input.value.trim();
+      if (!text) return;
+      await authFetch('/api/addcomment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: window._currentVideoUrlAdult, avatar: user.avatar, text })
+      });
+      input.value = '';
+      loadCommentsAdult(window._currentVideoUrlAdult);
+    }
+
+    async function deleteCommentAdult(id) {
+      if (!confirm('Delete this comment?')) return;
+      await authFetch('/api/deletecomment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      loadCommentsAdult(window._currentVideoUrlAdult);
+    }
+
     function goBackAdult() {
+      if (window._progressTimerAdult) clearInterval(window._progressTimerAdult);
       const videoEl = document.getElementById('videoPlayer');
       videoEl.pause();
       videoEl.onended = null;
@@ -445,6 +563,8 @@
       clearTimeout(controlsHideTimer);
     }
  
+    let allProgress = [];
+
     async function loadVideos() {
       const res     = await fetch('/api/videos');
       const all     = await res.json();
@@ -454,6 +574,8 @@
       const fRes    = await fetch('/api/favorites?username=' + user.username);
       const favData = await fRes.json();
       allFavorites  = favData.map(f => f.videoUrl);
+      const pRes    = await fetch('/api/progress?username=' + user.username);
+      allProgress   = await pRes.json();
       renderVideos();
     }
 
@@ -484,12 +606,18 @@
 
         const isFav = allFavorites.includes(videoUrl);
         const thumbStyle = v.thumb ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;' : '';
+        const prog    = allProgress.find(function(p) { return p.videoUrl === videoUrl; });
+        const watched = prog && prog.watched;
+        const continu = prog && !prog.watched && prog.current > 0;
+        const pct     = prog && prog.duration > 0 ? (prog.current / prog.duration * 100).toFixed(0) : 0;
 
         const card = document.createElement('div');
         card.className = 'video-card';
         card.innerHTML =
           '<div class="thumbnail" style="' + thumbStyle + '">' +
-            (v.type === 'series' ? '<div class="thumb-badge">📺 ' + (v.episodes ? v.episodes.length : 0) + ' Eps</div>' : '<div class="thumb-badge">▶</div>') +
+            (watched ? '<div class="thumb-badge" style="background:#00dd66; color:#000;">✓ Watched</div>' :
+             continu ? '<div class="thumb-badge" style="background:#FFD700; color:#000;">▶ Continue</div>' :
+             v.type === 'series' ? '<div class="thumb-badge">📺 ' + (v.episodes ? v.episodes.length : 0) + ' Eps</div>' : '<div class="thumb-badge">▶</div>') +
             '<div class="thumb-category" style="background:#ff4477;">' + v.category + '</div>' +
             '<div class="thumb-overlay">' +
               '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
@@ -497,6 +625,7 @@
                 '<span style="cursor:default;">' + (isFav ? '❤️' : '🤍') + '</span>' +
               '</div>' +
               '<div style="display:flex; gap:2px; margin-top:4px;">' + stars + '</div>' +
+              (continu ? '<div style="background:rgba(0,0,0,0.5); border-radius:999px; height:4px; margin-top:6px; overflow:hidden;"><div style="background:#ff4477; height:100%; width:' + pct + '%;"></div></div>' : '') +
             '</div>' +
           '</div>';
 
