@@ -158,6 +158,11 @@
     <button onclick="setCategory('Anime movie')" id="cat-Anime-movie" class="grid-btn">Anime movie</button>
   </div>
 
+  <script>
+    if (sessionStorage.getItem('jumpToVideo')) {
+      document.write('<style>#gridSection,#filterBar,#ratedSection{display:none !important;}</style>');
+    }
+  </script>
   <div id="gridSection">
     <div class="video-grid grid-2" id="videoGrid"></div>
     <div id="paginationBar" style="display:flex; justify-content:center; align-items:center; gap:6px; padding:16px; flex-wrap:wrap;"></div>
