@@ -287,14 +287,6 @@
       });
     }
 
-    function toggleSection(id) {
-      const box   = document.getElementById(id);
-      const arrow = document.getElementById(id + 'Arrow');
-      const isHidden = box.style.display === 'none';
-      box.style.display = isHidden ? 'block' : 'none';
-      arrow.textContent = isHidden ? '▴' : '▾';
-    }
-
     async function openProfile(username) {
       const uRes    = await fetch('/api/users');
       const users   = await uRes.json();
@@ -319,8 +311,6 @@
       buildRatingsList(document.getElementById('mRatings'), myRatings, videos, function(v) { return !adultCategories.includes(v.category); });
       buildRatingsList(document.getElementById('mRatingsAdult'), myRatings, videos, function(v) { return adultCategories.includes(v.category); });
 
-      document.getElementById('modalOverlay').classList.add('open');
-    }
       document.getElementById('modalOverlay').classList.add('open');
     }
 
