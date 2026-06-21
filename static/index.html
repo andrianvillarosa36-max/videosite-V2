@@ -156,10 +156,6 @@
     <button onclick="setCategory('Favorites')" id="cat-Favorites" class="grid-btn">❤️ Favorites</button>
     <button onclick="setCategory('Anime')" id="cat-Anime" class="grid-btn">Anime</button>
     <button onclick="setCategory('Anime movie')" id="cat-Anime-movie" class="grid-btn">Anime movie</button>
-    <button onclick="setCategory('NTR Anime corn')" id="cat-NTR-Anime-corn" class="grid-btn">NTR Anime corn</button>
-    <button onclick="setCategory('Anime corn')" id="cat-Anime-corn" class="grid-btn">Anime corn</button>
-    <button onclick="setCategory('Anime series corn')" id="cat-Anime-series-corn" class="grid-btn">Anime series corn</button>
-    <button onclick="setCategory('Corn')" id="cat-Corn" class="grid-btn">Corn</button>
   </div>
 
   <div id="gridSection">
@@ -379,9 +375,12 @@
     let allFavorites = [];
     let allLikes = [];
 
+    const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
+
     async function loadVideos() {
       const res     = await fetch('/api/videos');
-      allVideos     = await res.json();
+      const all     = await res.json();
+      allVideos     = all.filter(function(v) { return !adultCategories.includes(v.category); });
       const rRes    = await fetch('/api/ratings');
       allRatings    = await rRes.json();
       const pRes    = await fetch('/api/progress?username=' + user.username);
