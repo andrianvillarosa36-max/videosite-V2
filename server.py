@@ -783,16 +783,41 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == '/api/submitsuggestion':
             session = require_auth(self)
             if not session: return
-            body = json.loads(self.rfile.read(length))
-            title = body.get('title', '').strip()
-            description = body.get('description', '').strip()
-            category = body.get('category', '')
-            vtype = body.get('type', 'video')
-            thumb = body.get('thumb', '').strip()
+
+            content_type = self.headers.get('Content-Type', '')
+            THUMB_LIMIT = 10 * 1024 * 1024  # 10MB, plenty for an image
+
+            if 'multipart/form-data' in content_type:
+                try:
+                    fields = parse_multipart_stream(self.rfile, content_type, length, THUMB_LIMIT)
+                except ValueError:
+                    self.send_json({'success': False, 'message': 'Thumbnail exceeds the 10MB limit.'})
+                    return
+                title = fields.get('title', '').strip()
+                description = fields.get('description', '').strip()
+                category = fields.get('category', '')
+                vtype = fields.get('type', 'video')
+                thumb_files = fields.get('_files', [])
+            else:
+                body = json.loads(self.rfile.read(length))
+                title = body.get('title', '').strip()
+                description = body.get('description', '').strip()
+                category = body.get('category', '')
+                vtype = body.get('type', 'video')
+                thumb_files = []
 
             if not title:
                 self.send_json({'success': False, 'message': 'Title is required.'})
                 return
+
+            thumb = ''
+            if thumb_files:
+                try:
+                    thumb = upload_to_catbox(thumb_files[0]['filename'], thumb_files[0]['body'])
+                except Exception as e:
+                    print(f'Thumbnail upload error: {e}')
+                    self.send_json({'success': False, 'message': 'Thumbnail upload failed. Try again.'})
+                    return
 
             with db_cursor() as (conn, cur):
                 cur.execute(
@@ -828,11 +853,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
             description = fields.get('description', '').strip()
             category = fields.get('category', '')
             vtype = fields.get('type', 'video')
-            thumb = fields.get('thumb', '').strip()
 
             if not title:
                 self.send_json({'success': False, 'message': 'Title is required.'})
                 return
+
+            thumb = ''
+            thumb_uploads = [f for f in files if f['field'] == 'thumb_file']
+            if thumb_uploads:
+                try:
+                    thumb = upload_to_catbox(thumb_uploads[0]['filename'], thumb_uploads[0]['body'])
+                except Exception as e:
+                    print(f'Thumbnail upload error: {e}')
+                    self.send_json({'success': False, 'message': 'Thumbnail upload failed. Try again.'})
+                    return
+
+            # exclude the thumbnail from the list of episode/video files below
+            files = [f for f in files if f['field'] != 'thumb_file']
 
             PER_FILE_LIMIT = 200 * 1024 * 1024
             for f in files:
