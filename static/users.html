@@ -160,20 +160,6 @@
         </h3>
         <div id="mRatings" style="display:none;"></div>
       </div>
-
-      <div class="modal-section">
-        <h3 onclick="toggleSection('mFavAdult')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
-          <span>🔞❤️ Their 18+ Favorites</span><span id="mFavAdultArrow">▾</span>
-        </h3>
-        <div id="mFavAdult" style="display:none;"></div>
-      </div>
-
-      <div class="modal-section">
-        <h3 onclick="toggleSection('mRatingsAdult')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
-          <span>🔞⭐ Their 18+ Ratings</span><span id="mRatingsAdultArrow">▾</span>
-        </h3>
-        <div id="mRatingsAdult" style="display:none;"></div>
-      </div>
     </div>
   </div>
 
@@ -306,10 +292,8 @@
 
       const myRatings = ratings.filter(r => r.username === username);
 
-      buildFavGrid(document.getElementById('mFavorites'), favUrls, videos, function(v) { return !adultCategories.includes(v.category); });
-      buildFavGrid(document.getElementById('mFavAdult'), favUrls, videos, function(v) { return adultCategories.includes(v.category); });
-      buildRatingsList(document.getElementById('mRatings'), myRatings, videos, function(v) { return !adultCategories.includes(v.category); });
-      buildRatingsList(document.getElementById('mRatingsAdult'), myRatings, videos, function(v) { return adultCategories.includes(v.category); });
+      buildFavGrid(document.getElementById('mFavorites'), favUrls, videos, function(v) { return true; });
+      buildRatingsList(document.getElementById('mRatings'), myRatings, videos, function(v) { return true; });
 
       document.getElementById('modalOverlay').classList.add('open');
     }
