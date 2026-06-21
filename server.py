@@ -33,6 +33,11 @@ def get_pool():
         _db_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, db_url)
     return _db_pool
 
+def ensure_schema():
+    with db_cursor() as (conn, cur):
+        cur.execute("ALTER TABLE videos ADD COLUMN IF NOT EXISTS position INTEGER")
+        cur.execute("UPDATE videos SET position = id WHERE position IS NULL")
+
 def get_db():
     conn = get_pool().getconn()
     conn.cursor_factory = psycopg2.extras.RealDictCursor
@@ -219,12 +224,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.serve_file(os.path.join(STATIC_DIR, 'settings.html'), 'text/html')
         elif path == '/profile.html':
             self.serve_file(os.path.join(STATIC_DIR, 'profile.html'), 'text/html')
+        elif path == '/reorder.html':
+            self.serve_file(os.path.join(STATIC_DIR, 'reorder.html'), 'text/html')
         elif path == '/signup.html':
             self.serve_file(os.path.join(STATIC_DIR, 'signup.html'), 'text/html')
 
         elif path == '/api/videos':
             with db_cursor() as (conn, cur):
-                cur.execute('SELECT * FROM videos ORDER BY id')
+                cur.execute('SELECT * FROM videos ORDER BY position ASC, id ASC')
                 rows = cur.fetchall()
             self.send_json([video_row_to_json(v) for v in rows])
 
@@ -384,6 +391,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self.send_json({'success': True})
                 else:
                     self.send_json({'success': False, 'message': 'No URL provided'})
+
+        elif path == '/api/reordervideos':
+            session = require_admin(self)
+            if not session: return
+            body  = json.loads(self.rfile.read(length))
+            order = body.get('order', [])  # list of filenames in new order
+
+            with db_cursor() as (conn, cur):
+                for idx, filename in enumerate(order):
+                    cur.execute('UPDATE videos SET position = %s WHERE filename = %s', (idx, filename))
+            self.send_json({'success': True})
 
         elif path == '/api/delete':
             session = require_admin(self)
@@ -760,6 +778,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    ensure_schema()
     port = int(os.environ.get('PORT', 8080))
     print(f'Server running on port {port}')
     http.server.HTTPServer(('0.0.0.0', port), Handler).serve_forever()

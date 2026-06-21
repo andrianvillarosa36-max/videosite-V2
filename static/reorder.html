@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reorder Videos — Admin</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .reorder-list { padding: 12px; }
+
+    .reorder-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 8px;
+      touch-action: none;
+    }
+
+    .reorder-item.dragging {
+      opacity: 0.4;
+      border-color: var(--accent);
+    }
+
+    .drag-handle {
+      font-size: 1.3rem;
+      color: var(--muted);
+      cursor: grab;
+      padding: 6px;
+      flex-shrink: 0;
+    }
+
+    .reorder-thumb {
+      width: 44px;
+      height: 62px;
+      border-radius: 6px;
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+
+    .reorder-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .save-bar {
+      position: sticky;
+      bottom: 0;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      padding: 12px;
+    }
+
+    .save-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="logo">🔀 Reorder Videos</div>
+    <div class="nav-right">
+      <a href="/admin.html" style="color:var(--accent); font-size:0.82rem; text-decoration:none;">⚙️ Admin</a>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <p style="text-align:center; color:var(--muted); font-size:0.78rem; padding:10px;">Drag using ☰ to reorder. Tap Save when done.</p>
+
+  <div class="reorder-list" id="reorderList"></div>
+
+  <div class="save-bar">
+    <button class="save-btn" onclick="saveOrder()">💾 Save Order</button>
+  </div>
+
+  <script>
+    (function() {
+      const themes = {
+        dark:       { bg:'#0D1117', card:'#1C2333', text:'#ffffff', border:'#30363D', muted:'#8B949E', accent:'#00D4FF' },
+        light:      { bg:'#f0f2f5', card:'#ffffff', text:'#1a1a1a', border:'#dcdfe4', muted:'#6b7280', accent:'#0077ff' },
+        neonred:    { bg:'#0D0508', card:'#1f0a10', text:'#ffe5e8', border:'#3D1018', muted:'#a87c82', accent:'#FF1744' },
+        neonpink:   { bg:'#0D0510', card:'#1f0a1a', text:'#ffe5f5', border:'#3D1030', muted:'#a87c9c', accent:'#FF2D9E' },
+        neongreen:  { bg:'#050D08', card:'#0a1f12', text:'#e5ffe9', border:'#103D1E', muted:'#7ca889', accent:'#00FF66' },
+        neonviolet: { bg:'#0A050D', card:'#160a1f', text:'#f0e5ff', border:'#2A103D', muted:'#947ca8', accent:'#B026FF' }
+      };
+      const name = localStorage.getItem('theme') || 'dark';
+      const t = themes[name];
+      document.documentElement.style.setProperty('--bg', t.bg);
+      document.documentElement.style.setProperty('--card', t.card);
+      document.documentElement.style.setProperty('--text', t.text);
+      document.documentElement.style.setProperty('--border', t.border);
+      document.documentElement.style.setProperty('--muted', t.muted);
+      document.documentElement.style.setProperty('--accent', t.accent);
+      document.body.style.background = t.bg;
+      document.body.style.color = t.text;
+    })();
+
+    const user = JSON.parse(sessionStorage.getItem('user') || 'null');
+    if (!user || user.role !== 'admin') window.location.href = '/login.html';
+
+    const token = sessionStorage.getItem('token');
+    function authFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, options);
+    }
+
+    let videos = [];
+    let dragSrcIndex = null;
+
+    async function loadVideos() {
+      const res = await fetch('/api/videos');
+      videos = await res.json();
+      render();
+    }
+
+    function render() {
+      const list = document.getElementById('reorderList');
+      list.innerHTML = '';
+      videos.forEach(function(v, idx) {
+        const item = document.createElement('div');
+        item.className = 'reorder-item';
+        item.draggable = true;
+        item.dataset.index = idx;
+
+        const thumbStyle = v.thumb ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;' : '';
+
+        item.innerHTML =
+          '<span class="drag-handle">☰</span>' +
+          '<div class="reorder-thumb" style="' + thumbStyle + '"></div>' +
+          '<span class="reorder-title">' + (idx + 1) + '. ' + v.title + (v.type === 'series' ? ' 📺' : '') + '</span>';
+
+        item.addEventListener('dragstart', function(e) {
+          dragSrcIndex = idx;
+          item.classList.add('dragging');
+        });
+        item.addEventListener('dragend', function() {
+          item.classList.remove('dragging');
+        });
+        item.addEventListener('dragover', function(e) {
+          e.preventDefault();
+        });
+        item.addEventListener('drop', function(e) {
+          e.preventDefault();
+          const targetIndex = idx;
+          if (dragSrcIndex === null || dragSrcIndex === targetIndex) return;
+          const moved = videos.splice(dragSrcIndex, 1)[0];
+          videos.splice(targetIndex, 0, moved);
+          dragSrcIndex = null;
+          render();
+        });
+
+        // Touch support for mobile (drag handle press-and-move)
+        let touchStartY = null;
+        item.querySelector('.drag-handle').addEventListener('touchstart', function(e) {
+          dragSrcIndex = idx;
+          touchStartY = e.touches[0].clientY;
+          item.classList.add('dragging');
+        }, { passive: true });
+
+        item.addEventListener('touchmove', function(e) {
+          if (dragSrcIndex === null) return;
+          const touchY = e.touches[0].clientY;
+          const elements = Array.from(document.querySelectorAll('.reorder-item'));
+          for (const el of elements) {
+            const rect = el.getBoundingClientRect();
+            if (touchY > rect.top && touchY < rect.bottom) {
+              const overIndex = parseInt(el.dataset.index);
+              if (overIndex !== dragSrcIndex) {
+                const moved = videos.splice(dragSrcIndex, 1)[0];
+                videos.splice(overIndex, 0, moved);
+                dragSrcIndex = overIndex;
+                render();
+              }
+              break;
+            }
+          }
+        }, { passive: true });
+
+        item.addEventListener('touchend', function() {
+          dragSrcIndex = null;
+          render();
+        });
+
+        list.appendChild(item);
+      });
+    }
+
+    async function saveOrder() {
+      const order = videos.map(function(v) { return v.filename; });
+      const res  = await authFetch('/api/reordervideos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('✅ Order saved!');
+      } else {
+        alert('❌ ' + (data.message || 'Failed to save'));
+      }
+    }
+
+    function logout() {
+      authFetch('/api/logout', { method: 'POST' }).catch(function() {});
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      window.location.href = '/login.html';
+    }
+
+    loadVideos();
+  </script>
+
+</body>
+</html>
