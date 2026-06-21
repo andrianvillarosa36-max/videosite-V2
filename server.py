@@ -11,6 +11,9 @@ import psycopg2
 import psycopg2.extras
 import psycopg2.pool
 
+import urllib.request
+import uuid
+
 online_users = {}
 sessions = {}  # token -> { 'username': ..., 'role': ..., 'created': ... }
 
@@ -122,6 +125,44 @@ def safe_join(base_dir, filename):
     if not full_abs.startswith(base_abs + os.sep) and full_abs != base_abs:
         return None
     return full_path
+
+def parse_multipart_stream(rfile, content_type, content_length, max_size):
+    boundary = content_type.split('boundary=')[1].encode()
+    if content_length > max_size:
+        raise ValueError('File too large')
+    data = rfile.read(content_length)
+    parts = data.split(b'--' + boundary)
+    fields = {}
+    for part in parts[1:-1]:
+        header, _, body = part[2:].partition(b'\r\n\r\n')
+        header = header.decode(errors='ignore')
+        body = body.rstrip(b'\r\n')
+        if 'filename="' in header:
+            filename = header.split('filename="')[1].split('"')[0]
+            fields['file'] = (filename, body)
+        elif 'name="' in header:
+            name = header.split('name="')[1].split('"')[0]
+            fields[name] = body.decode(errors='ignore')
+    return fields
+
+def upload_to_catbox(filename, file_bytes):
+    boundary = uuid.uuid4().hex
+    body = b''
+    body += f'--{boundary}\r\nContent-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n'.encode()
+    body += f'--{boundary}\r\nContent-Disposition: form-data; name="fileToUpload"; filename="{filename}"\r\nContent-Type: application/octet-stream\r\n\r\n'.encode()
+    body += file_bytes
+    body += f'\r\n--{boundary}--\r\n'.encode()
+
+    req = urllib.request.Request(
+        'https://catbox.moe/user/api.php',
+        data=body,
+        headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        result = resp.read().decode().strip()
+    if not result.startswith('https://files.catbox.moe/'):
+        raise Exception(f'Catbox upload failed: {result}')
+    return result
 
 def hash_password(password, salt=None):
     if salt is None:
@@ -312,6 +353,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 cur.execute('SELECT * FROM comments WHERE video_url = %s ORDER BY id', (videoUrl,))
                 rows = cur.fetchall()
             self.send_json([comment_row_to_json(c) for c in rows])
+
+        elif path == '/api/mysubmissions':
+            session = require_auth(self)
+            if not session: return
+            with db_cursor() as (conn, cur):
+                cur.execute(
+                    '''SELECT id, kind, title, description, category, type, status, admin_note, created_at
+                       FROM submissions WHERE username = %s ORDER BY created_at DESC''',
+                    (session['username'],)
+                )
+                rows = cur.fetchall()
+            self.send_json([dict(r) for r in rows])
+
+        elif path == '/api/submissions':
+            session = require_admin(self)
+            if not session: return
+            with db_cursor() as (conn, cur):
+                cur.execute(
+                    '''SELECT * FROM submissions ORDER BY
+                       CASE status WHEN 'pending' THEN 0 ELSE 1 END, created_at DESC'''
+                )
+                rows = cur.fetchall()
+            self.send_json([dict(r) for r in rows])
 
         else:
             self.send_error(404)
@@ -711,6 +775,122 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 )
             self.send_json({'success': True})
 
+        elif path == '/api/submitsuggestion':
+            session = require_auth(self)
+            if not session: return
+            body = json.loads(self.rfile.read(length))
+            title = body.get('title', '').strip()
+            description = body.get('description', '').strip()
+            category = body.get('category', '')
+            vtype = body.get('type', 'video')
+
+            if not title:
+                self.send_json({'success': False, 'message': 'Title is required.'})
+                return
+
+            with db_cursor() as (conn, cur):
+                cur.execute(
+                    '''INSERT INTO submissions (username, kind, title, description, category, type, status)
+                       VALUES (%s, 'suggestion', %s, %s, %s, %s, 'pending')''',
+                    (session['username'], title, description, category, vtype)
+                )
+            self.send_json({'success': True})
+
+        elif path == '/api/submitupload':
+            session = require_auth(self)
+            if not session: return
+
+            content_type = self.headers.get('Content-Type', '')
+            if 'multipart/form-data' not in content_type:
+                self.send_json({'success': False, 'message': 'Invalid upload format.'})
+                return
+
+            MAX_UPLOAD_SIZE = 200 * 1024 * 1024  # 200MB
+
+            try:
+                fields = parse_multipart_stream(self.rfile, content_type, length, MAX_UPLOAD_SIZE)
+            except ValueError:
+                self.send_json({'success': False, 'message': 'File exceeds the 200MB limit.'})
+                return
+
+            if 'file' not in fields:
+                self.send_json({'success': False, 'message': 'No file provided.'})
+                return
+
+            title = fields.get('title', '').strip()
+            description = fields.get('description', '').strip()
+            category = fields.get('category', '')
+            vtype = fields.get('type', 'video')
+
+            if not title:
+                self.send_json({'success': False, 'message': 'Title is required.'})
+                return
+
+            filename, file_bytes = fields['file']
+
+            try:
+                catbox_url = upload_to_catbox(filename, file_bytes)
+            except Exception as e:
+                print(f'Catbox upload error: {e}')
+                self.send_json({'success': False, 'message': 'Upload failed. Try a smaller file or check your connection.'})
+                return
+
+            with db_cursor() as (conn, cur):
+                cur.execute(
+                    '''INSERT INTO submissions (username, kind, title, description, category, type, catbox_url, status)
+                       VALUES (%s, 'upload', %s, %s, %s, %s, %s, 'pending')''',
+                    (session['username'], title, description, category, vtype, catbox_url)
+                )
+            self.send_json({'success': True})
+
+        elif path == '/api/reviewsubmission':
+            session = require_admin(self)
+            if not session: return
+            body = json.loads(self.rfile.read(length))
+            sub_id = body.get('id')
+            action = body.get('action')  # 'approve' or 'reject'
+            admin_note = body.get('admin_note', '')
+
+            if action not in ('approve', 'reject'):
+                self.send_json({'success': False, 'message': 'Invalid action.'})
+                return
+
+            with db_cursor() as (conn, cur):
+                cur.execute('SELECT * FROM submissions WHERE id = %s', (sub_id,))
+                sub = cur.fetchone()
+                if not sub:
+                    self.send_json({'success': False, 'message': 'Submission not found.'})
+                    return
+
+                if action == 'reject':
+                    cur.execute(
+                        'UPDATE submissions SET status = %s, admin_note = %s WHERE id = %s',
+                        ('rejected', admin_note, sub_id)
+                    )
+                    self.send_json({'success': True})
+                    return
+
+                # approve
+                if sub['kind'] == 'upload' and sub['catbox_url']:
+                    filename = sub['catbox_url'].split('/')[-1]
+                    cur.execute(
+                        '''INSERT INTO videos (title, filename, url, thumb, category, type)
+                           VALUES (%s, %s, %s, '', %s, %s)''',
+                        (sub['title'], filename, sub['catbox_url'], sub['category'], sub['type'])
+                    )
+                    cur.execute(
+                        'UPDATE submissions SET status = %s, admin_note = %s WHERE id = %s',
+                        ('approved', admin_note, sub_id)
+                    )
+                    self.send_json({'success': True})
+                else:
+                    # suggestion-only: mark approved but admin must add the actual video manually
+                    cur.execute(
+                        'UPDATE submissions SET status = %s, admin_note = %s WHERE id = %s',
+                        ('approved', admin_note, sub_id)
+                    )
+                    self.send_json({'success': True})
+
         else:
             self.send_error(404)
 
@@ -762,7 +942,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
 
     def send_json(self, data):
-        body = json.dumps(data).encode()
+        def _json_default(obj):
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            raise TypeError(f'Object of type {type(obj)} is not JSON serializable')
+        body = json.dumps(data, default=_json_default).encode()	
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Content-Length', len(body))
