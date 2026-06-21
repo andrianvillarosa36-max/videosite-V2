@@ -266,6 +266,7 @@
 
         row.addEventListener('click', function() {
           sessionStorage.setItem('jumpToVideo', JSON.stringify(item.v));
+          sessionStorage.setItem('cameFromAdult', 'true');
           window.location.href = '/index.html';
         });
 

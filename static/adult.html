@@ -160,6 +160,7 @@
 
         card.addEventListener('click', function() {
           sessionStorage.setItem('jumpToVideo', JSON.stringify(v));
+          sessionStorage.setItem('cameFromAdult', 'true');
           window.location.href = '/index.html';
         });
 

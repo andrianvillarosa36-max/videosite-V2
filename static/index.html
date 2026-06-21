@@ -84,7 +84,7 @@
           </div>
         </div>
     </div>
-    <button class="back-btn" onclick="goBack()">← Back to videos</button>
+    <button class="back-btn" onclick="backToOrigin()">← Back to videos</button>
     <div class="player-wrap">
       <p class="player-title" id="playerTitle"></p>
       <div id="playerTags" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
@@ -114,7 +114,7 @@
 
   <!-- SERIES EPISODE PICKER (hidden by default) -->
   <div id="seriesSection" style="display:none;">
-    <button class="back-btn" onclick="goBack()">← Back to videos</button>
+    <button class="back-btn" onclick="backToOrigin()">← Back to videos</button>
     <div style="padding:16px;">
       <p id="seriesTitle" style="font-size:1.1rem; font-weight:700; margin-bottom:10px;"></p>
       <!-- Favorite/rating now shown inside the episode player itself -->
@@ -916,6 +916,16 @@
       loadComments(ep.url, 'commentList');
       videoEl.play();
       window.scrollTo(0, 0);
+    }
+
+    function backToOrigin() {
+      const cameFromAdult = sessionStorage.getItem('cameFromAdult');
+      if (cameFromAdult === 'true') {
+        sessionStorage.removeItem('cameFromAdult');
+        window.location.href = '/adult.html';
+      } else {
+        goBack();
+      }
     }
 
     function goBack() {
