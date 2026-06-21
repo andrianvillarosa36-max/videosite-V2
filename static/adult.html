@@ -50,6 +50,52 @@
     <button onclick="setCategory('Corn')" id="cat-Corn" class="grid-btn">Corn</button>
   </div>
 
+  <!-- VIDEO PLAYER (hidden by default) -->
+  <div id="playerSection" style="display:none;">
+    <button class="back-btn" onclick="goBackAdult()">← Back to 18+ Corner</button>
+    <div id="playerWrap" style="position:relative; background:#000;" onclick="onPlayerTap(event)">
+      <video id="videoPlayer" playsinline></video>
+
+      <button id="lockBtn" onclick="event.stopPropagation(); toggleLock()" style="position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.3); color:#fff; border-radius:6px; padding:6px 8px; font-size:1rem; cursor:pointer; width:auto; z-index:20; display:none;">🔓</button>
+
+      <div id="customControls" style="position:absolute; inset:0; z-index:10; opacity:1; transition:opacity 0.25s;">
+        <div id="centerPlayBtn" onclick="event.stopPropagation(); togglePlay()" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:54px; height:54px; background:rgba(0,0,0,0.55); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.6rem; cursor:pointer;">▶️</div>
+
+        <div style="position:absolute; top:8px; right:8px; display:flex; gap:6px;" onclick="event.stopPropagation()">
+          <button onclick="toggleOrientation()" id="orientBtn" style="background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.3); color:#fff; border-radius:6px; padding:6px 8px; font-size:0.95rem; cursor:pointer; width:auto;">🔄</button>
+          <button onclick="cycleSpeed()" id="speedBtn" style="background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.3); color:#fff; border-radius:6px; padding:6px 8px; font-size:0.8rem; cursor:pointer; width:auto;">1.0x</button>
+        </div>
+
+        <div style="position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent, rgba(0,0,0,0.75)); padding:24px 16px 12px;" onclick="event.stopPropagation()">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <span id="curTime" style="color:#fff; font-size:0.7rem; min-width:34px;">0:00</span>
+            <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" style="flex:1; height:4px; accent-color:#ff4477;" oninput="onSeek(this.value)" />
+            <span id="durTime" style="color:#fff; font-size:0.7rem; min-width:34px;">0:00</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:14px;">
+            <span onclick="togglePlay()" id="playPauseIcon" style="cursor:pointer; font-size:1.1rem;">▶️</span>
+            <span onclick="skip(-10)" style="cursor:pointer; font-size:1rem;">⏪</span>
+            <span onclick="skip(10)" style="cursor:pointer; font-size:1rem;">⏩</span>
+            <span onclick="toggleMute()" id="volIcon" style="cursor:pointer; font-size:1rem;">🔊</span>
+            <input type="range" id="volBar" min="0" max="1" value="1" step="0.05" style="width:50px; height:3px; accent-color:#ff4477;" oninput="onVolume(this.value)" />
+            <span onclick="toggleFullscreen()" style="cursor:pointer; font-size:1.4rem; margin-left:auto; padding:8px 10px; margin-right:4px;">⛶</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:16px;">
+      <p class="player-title" id="playerTitle"></p>
+      <div id="playerTags" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
+      <div id="likeBar" style="display:flex; gap:10px; margin-top:12px; align-items:center;"></div>
+
+      <div id="episodeSection" style="display:none; margin-top:16px;">
+        <p style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">📺 Episodes</p>
+        <div id="episodeList"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="gridSection">
     <div class="video-grid grid-2" id="videoGrid"></div>
   </div>
@@ -102,6 +148,296 @@
     let allVideos = [];
     let allRatings = [];
     let allFavorites = [];
+
+    let controlsHideTimer = null;
+    let isLocked = false;
+    const speedOptions = [1, 1.25, 1.5, 2, 0.5];
+    let speedIndex = 0;
+    let currentSeriesAdult = null;
+    let currentEpIndexAdult = 0;
+
+    function formatTime(sec) {
+      if (!isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function togglePlay() {
+      const v = document.getElementById('videoPlayer');
+      if (v.paused) { v.play(); } else { v.pause(); }
+    }
+
+    function skip(amount) {
+      const v = document.getElementById('videoPlayer');
+      v.currentTime = Math.min(Math.max(0, v.currentTime + amount), v.duration || 0);
+      showControls();
+    }
+
+    function onSeek(value) {
+      const v = document.getElementById('videoPlayer');
+      if (v.duration) v.currentTime = (value / 100) * v.duration;
+    }
+
+    function onVolume(value) {
+      const v = document.getElementById('videoPlayer');
+      v.volume = value;
+      document.getElementById('volIcon').textContent = value == 0 ? '🔇' : '🔊';
+    }
+
+    function toggleMute() {
+      const v = document.getElementById('videoPlayer');
+      v.muted = !v.muted;
+      document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
+    }
+
+    function toggleOrientation() {
+      const wrap = document.getElementById('playerWrap');
+      if (!document.fullscreenElement) {
+        wrap.requestFullscreen().then(function() {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(function() {});
+          }
+        }).catch(function() {});
+      } else {
+        if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+      }
+    }
+
+    function cycleSpeed() {
+      speedIndex = (speedIndex + 1) % speedOptions.length;
+      const v = document.getElementById('videoPlayer');
+      v.playbackRate = speedOptions[speedIndex];
+      document.getElementById('speedBtn').textContent = speedOptions[speedIndex] + 'x';
+      showControls();
+    }
+
+    function toggleFullscreen() {
+      const wrap = document.getElementById('playerWrap');
+      if (!document.fullscreenElement) {
+        wrap.requestFullscreen().catch(function() {});
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function toggleLock() {
+      isLocked = !isLocked;
+      const lockBtn = document.getElementById('lockBtn');
+      const controls = document.getElementById('customControls');
+      lockBtn.textContent = isLocked ? '🔒' : '🔓';
+      if (isLocked) {
+        controls.classList.add('controls-hidden');
+      } else {
+        controls.classList.remove('controls-hidden');
+        showControls();
+      }
+    }
+
+    function onPlayerTap(e) {
+      if (isLocked) {
+        document.getElementById('lockBtn').style.display = 'block';
+        clearTimeout(window._lockBtnTimer);
+        window._lockBtnTimer = setTimeout(function() {
+          document.getElementById('lockBtn').style.display = 'none';
+        }, 2000);
+        return;
+      }
+      const controls = document.getElementById('customControls');
+      if (controls.classList.contains('controls-hidden')) {
+        showControls();
+      } else {
+        hideControlsNow();
+      }
+    }
+
+    function showControls() {
+      if (isLocked) return;
+      const controls = document.getElementById('customControls');
+      controls.classList.remove('controls-hidden');
+      document.getElementById('lockBtn').style.display = 'block';
+      clearTimeout(controlsHideTimer);
+      const v = document.getElementById('videoPlayer');
+      if (!v.paused) {
+        controlsHideTimer = setTimeout(hideControlsNow, 3000);
+      }
+    }
+
+    function hideControlsNow() {
+      if (isLocked) return;
+      document.getElementById('customControls').classList.add('controls-hidden');
+      document.getElementById('lockBtn').style.display = 'none';
+    }
+
+    function setupCustomPlayer() {
+      const v = document.getElementById('videoPlayer');
+      isLocked = false;
+      document.getElementById('lockBtn').textContent = '🔓';
+      document.getElementById('lockBtn').style.display = 'none';
+      speedIndex = 0;
+      v.playbackRate = 1;
+      document.getElementById('speedBtn').textContent = '1.0x';
+      document.getElementById('customControls').classList.remove('controls-hidden');
+
+      v.onplay = function() {
+        document.getElementById('playPauseIcon').textContent = '⏸️';
+        document.getElementById('centerPlayBtn').style.display = 'none';
+        showControls();
+      };
+      v.onpause = function() {
+        document.getElementById('playPauseIcon').textContent = '▶️';
+        document.getElementById('centerPlayBtn').style.display = 'flex';
+        clearTimeout(controlsHideTimer);
+      };
+      v.ontimeupdate = function() {
+        document.getElementById('curTime').textContent = formatTime(v.currentTime);
+        if (v.duration) document.getElementById('seekBar').value = (v.currentTime / v.duration) * 100;
+      };
+      v.onloadedmetadata = function() {
+        document.getElementById('durTime').textContent = formatTime(v.duration);
+      };
+      v.onvolumechange = function() {
+        document.getElementById('volIcon').textContent = v.muted || v.volume == 0 ? '🔇' : '🔊';
+      };
+    }
+
+    async function playVideoAdult(url, title, category, tags) {
+      const videoEl = document.getElementById('videoPlayer');
+      videoEl.src   = url;
+      setupCustomPlayer();
+      document.getElementById('playerTitle').textContent = title;
+      authFetch('/api/addview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: url })
+      });
+
+      const tagsBox = document.getElementById('playerTags');
+      tagsBox.innerHTML = '';
+      if (category) tagsBox.innerHTML += '<span style="background:#ff4477; color:#000; border-radius:4px; padding:3px 8px; font-size:0.75rem; font-weight:700;">' + category + '</span>';
+      if (tags && tags.length) {
+        tags.forEach(function(t) {
+          tagsBox.innerHTML += '<span style="background:#1C2333; color:#8B949E; border:1px solid #30363D; border-radius:4px; padding:3px 8px; font-size:0.75rem;">#' + t + '</span>';
+        });
+      }
+
+      const lRes = await fetch('/api/likes');
+      const likes = await lRes.json();
+      const videoLikes = likes.filter(function(l) { return l.videoUrl === url; });
+      const likeCount = videoLikes.filter(function(l) { return l.action === 'like'; }).length;
+      const disCount  = videoLikes.filter(function(l) { return l.action === 'dislike'; }).length;
+      const myLike = likes.find(function(l) { return l.videoUrl === url && l.username === user.username; });
+      const myRating = allRatings.find(function(r) { return r.videoUrl === url && r.username === user.username; });
+      const isFav = allFavorites.includes(url);
+
+      let playerStars = '';
+      for (let s = 1; s <= 5; s++) {
+        const color = myRating && myRating.rating >= s ? '#FFD700' : '#30363D';
+        playerStars += '<span onclick="rateVideoAdult(\'' + url.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + color + ';">★</span>';
+      }
+
+      document.getElementById('likeBar').innerHTML =
+        '<button onclick="toggleLikeAdult(\'' + url.replace(/'/g,"\\'") + '\',\'like\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'like' ? '#ff4477' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'like' ? '#ff4477' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👍 ' + likeCount + '</button>' +
+        '<button onclick="toggleLikeAdult(\'' + url.replace(/'/g,"\\'") + '\',\'dislike\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👎 ' + disCount + '</button>' +
+        '<span onclick="toggleFavAdult(\'' + url.replace(/'/g,"\\'") + '\')" style="cursor:pointer; font-size:1.3rem; margin-left:4px;">' + (isFav ? '❤️' : '🤍') + '</span>' +
+        '<span style="display:flex; gap:2px; margin-left:8px;">' + playerStars + '</span>';
+
+      document.getElementById('gridSection').style.display    = 'none';
+      document.getElementById('filterBar').style.display      = 'none';
+      document.getElementById('playerSection').style.display  = 'block';
+      window.scrollTo(0, 0);
+    }
+
+    function openSeriesAdult(v) {
+      currentSeriesAdult = v;
+      currentEpIndexAdult = 0;
+      playEpisodeAdult(0);
+    }
+
+    function playEpisodeAdult(idx) {
+      currentEpIndexAdult = idx;
+      const ep = currentSeriesAdult.episodes[idx];
+      const epList = document.getElementById('episodeList');
+      document.getElementById('episodeSection').style.display = 'block';
+      epList.innerHTML = '';
+      currentSeriesAdult.episodes.forEach(function(e, i) {
+        const div = document.createElement('div');
+        div.style.cssText = 'background:' + (i === idx ? '#3a1530' : '#1C2333') + '; border:1px solid ' + (i === idx ? '#ff4477' : '#30363D') + '; border-radius:8px; padding:10px 14px; margin-bottom:8px; cursor:pointer; display:flex; align-items:center; gap:10px;';
+        div.innerHTML = '<div style="width:26px; height:26px; background:' + (i === idx ? '#ff4477' : '#30363D') + '; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:0.72rem; font-weight:700; flex-shrink:0;">' + (i+1) + '</div><span style="font-size:0.82rem;">' + e.title + '</span>';
+        div.addEventListener('click', function() { playEpisodeAdult(i); });
+        epList.appendChild(div);
+      });
+
+      playVideoAdult(ep.url, currentSeriesAdult.title + ' — ' + ep.title, currentSeriesAdult.category, currentSeriesAdult.tags);
+
+      const videoEl = document.getElementById('videoPlayer');
+      videoEl.onended = function() {
+        if (currentEpIndexAdult < currentSeriesAdult.episodes.length - 1) {
+          playEpisodeAdult(currentEpIndexAdult + 1);
+        }
+      };
+    }
+
+    async function rateVideoAdult(videoUrl, star) {
+      const myRating = allRatings.find(function(r) { return r.videoUrl === videoUrl && r.username === user.username; });
+      if (myRating && myRating.rating === star) {
+        await authFetch('/api/unratevideo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl: videoUrl }) });
+      } else {
+        await authFetch('/api/ratevideo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl: videoUrl, rating: star }) });
+      }
+      const rRes = await fetch('/api/ratings');
+      allRatings = await rRes.json();
+      const newMyRating = allRatings.find(function(r) { return r.videoUrl === videoUrl && r.username === user.username; });
+      let starsHtml = '';
+      for (let s = 1; s <= 5; s++) {
+        const color = newMyRating && newMyRating.rating >= s ? '#FFD700' : '#30363D';
+        starsHtml += '<span onclick="rateVideoAdult(\'' + videoUrl.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + color + ';">★</span>';
+      }
+      const starsBox = document.querySelector('#likeBar span[style*="margin-left:8px"]');
+      if (starsBox) starsBox.innerHTML = starsHtml;
+    }
+
+    async function toggleFavAdult(videoUrl) {
+      const res = await authFetch('/api/togglefavorite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl }) });
+      const data = await res.json();
+      if (data.favorited) { if (!allFavorites.includes(videoUrl)) allFavorites.push(videoUrl); }
+      else { allFavorites = allFavorites.filter(function(u) { return u !== videoUrl; }); }
+      const heart = document.querySelector('#likeBar span[onclick*="toggleFavAdult"]');
+      if (heart) heart.textContent = data.favorited ? '❤️' : '🤍';
+    }
+
+    async function toggleLikeAdult(videoUrl, action) {
+      await authFetch('/api/togglelike', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl, action }) });
+      const lRes = await fetch('/api/likes');
+      const likes = await lRes.json();
+      const videoLikes = likes.filter(function(l) { return l.videoUrl === videoUrl; });
+      const likeCount = videoLikes.filter(function(l) { return l.action === 'like'; }).length;
+      const disCount  = videoLikes.filter(function(l) { return l.action === 'dislike'; }).length;
+      const myLike = likes.find(function(l) { return l.videoUrl === videoUrl && l.username === user.username; });
+      const likeBarEl = document.getElementById('likeBar');
+      const heart = likeBarEl.querySelector('span[onclick*="toggleFavAdult"]');
+      const heartHtml = heart ? heart.outerHTML : '';
+      const starsEl = likeBarEl.querySelector('span[style*="margin-left:8px"]');
+      const starsHtml = starsEl ? starsEl.outerHTML : '';
+      likeBarEl.innerHTML =
+        '<button onclick="toggleLikeAdult(\'' + videoUrl.replace(/'/g,"\\'") + '\',\'like\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'like' ? '#ff4477' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'like' ? '#ff4477' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👍 ' + likeCount + '</button>' +
+        '<button onclick="toggleLikeAdult(\'' + videoUrl.replace(/'/g,"\\'") + '\',\'dislike\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👎 ' + disCount + '</button>' +
+        heartHtml + starsHtml;
+    }
+
+    function goBackAdult() {
+      const videoEl = document.getElementById('videoPlayer');
+      videoEl.pause();
+      videoEl.onended = null;
+      videoEl.onplay  = null;
+      videoEl.onpause = null;
+      videoEl.src     = '';
+      document.getElementById('playerSection').style.display  = 'none';
+      document.getElementById('episodeSection').style.display = 'none';
+      document.getElementById('gridSection').style.display    = 'block';
+      document.getElementById('filterBar').style.display      = 'flex';
+      currentSeriesAdult = null;
+    }
 
     async function loadVideos() {
       const res     = await fetch('/api/videos');
@@ -159,9 +495,8 @@
           '</div>';
 
         card.addEventListener('click', function() {
-          sessionStorage.setItem('jumpToVideo', JSON.stringify(v));
-          sessionStorage.setItem('cameFromAdult', 'true');
-          window.location.href = '/index.html';
+          if (v.type === 'series') openSeriesAdult(v);
+          else playVideoAdult(v.url, v.title, v.category, v.tags);
         });
 
         grid.appendChild(card);
