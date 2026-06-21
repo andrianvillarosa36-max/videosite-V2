@@ -426,18 +426,20 @@
     }
 
     function goBackAdult() {
+      document.getElementById('likeBar').innerHTML = '';
+      if (window._progressTimer) clearInterval(window._progressTimer);
       const videoEl = document.getElementById('videoPlayer');
       videoEl.pause();
       videoEl.onended = null;
       videoEl.onplay  = null;
       videoEl.onpause = null;
       videoEl.src     = '';
-      document.getElementById('playerSection').style.display  = 'none';
-      document.getElementById('episodeSection').style.display = 'none';
-      document.getElementById('gridSection').style.display    = 'block';
-      document.getElementById('filterBar').style.display      = 'flex';
-      currentSeriesAdult = null;
-    }
+
+      // Manually reset custom player icon state since pausing right before
+      // clearing src can prevent the onpause event from firing reliably
+      document.getElementById('playPauseIcon').textContent = '▶️';
+      document.getElementById('centerPlayBtn').style.display = 'flex';
+      clearTimeout(controlsHideTimer);
 
     async function loadVideos() {
       const res     = await fetch('/api/videos');
