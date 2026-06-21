@@ -290,14 +290,18 @@
       const list = document.getElementById('episodeList');
       const idx = episodeCount++;
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex; gap:6px; margin-bottom:8px; align-items:center;';
+      row.className = 'episode-row';
+      row.style.cssText = 'background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:8px;';
       row.innerHTML = `
-        <input type="text" placeholder="Episode ${idx + 1} title" data-ep-title="${idx}" style="flex:1; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:9px 11px; color:var(--text); font-size:0.8rem;" />
-        <input type="file" accept="video/*" data-ep-file="${idx}" style="flex:1.4; font-size:0.72rem; color:var(--muted);" />
-        <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:#ff4477; font-size:1.1rem; cursor:pointer; padding:4px 8px;">✕</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:0.72rem; color:var(--muted); font-weight:700;">EPISODE ${idx + 1}</span>
+          <button type="button" onclick="this.closest('.episode-row').remove()" style="background:none; border:none; color:#ff4477; font-size:1rem; cursor:pointer; padding:2px 8px;">✕ Remove</button>
+        </div>
+        <input type="text" placeholder="Episode ${idx + 1} title" data-ep-title="${idx}" style="width:100%; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:9px 11px; color:var(--text); font-size:0.8rem; margin-bottom:8px;" />
+        <input type="file" accept="video/*" data-ep-file="${idx}" style="width:100%; font-size:0.75rem; color:var(--muted);" />
       `;
       list.appendChild(row);
-    }
+    }	
 
     function showStatus(msg, isError) {
       const el = document.getElementById('statusMsg');
