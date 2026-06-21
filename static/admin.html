@@ -61,6 +61,12 @@
     </p>
   </div>
 
+  <!-- SUBMISSIONS -->
+  <div style="margin: 0 16px 16px;">
+    <h2 style="font-size:1rem; margin-bottom:12px;">📥 User Submissions</h2>
+    <div id="submissionsList"></div>
+  </div>
+
   <!-- VIDEO LIST -->
   <div style="margin: 0 16px;">
     <h2 style="font-size:1rem; margin-bottom:12px;">Your Videos</h2>
@@ -209,6 +215,86 @@
       window.location.href = '/login.html';
     }
 
+    async function loadSubmissions() {
+      const list = document.getElementById('submissionsList');
+      try {
+        const res  = await authFetch('/api/submissions');
+        const subs = await res.json();
+
+        if (subs.length === 0) {
+          list.innerHTML = '<p style="color:#8B949E; font-size:0.82rem;">No submissions yet.</p>';
+          return;
+        }
+
+        let html = '';
+        subs.forEach(function(s) {
+          const icon = s.kind === 'upload' ? '📁' : '💡';
+          const typeLabel = s.type === 'series' ? '📺 Series' : '🎬 Video';
+          let mediaInfo = '';
+          if (s.kind === 'upload') {
+            if (s.type === 'series' && s.episodes) {
+              mediaInfo = `<p class="video-file">${s.episodes.length} episode(s)</p>`;
+            } else if (s.catbox_url) {
+              mediaInfo = `<p class="video-file">${s.catbox_url}</p>`;
+            }
+          }
+
+          const actions = s.status === 'pending'
+            ? `
+              <button onclick="reviewSubmission(${s.id}, 'approve')"
+                style="margin-top:8px; margin-right:8px; background:#0d2a1a; color:#00FF88; border:1px solid #00FF88; border-radius:6px; padding:6px 12px; font-size:0.78rem; width:auto; cursor:pointer;">
+                ✓ Approve
+              </button>
+              <button onclick="reviewSubmission(${s.id}, 'reject')"
+                style="margin-top:8px; background:#3a1a1a; color:#ff6666; border:1px solid #ff4444; border-radius:6px; padding:6px 12px; font-size:0.78rem; width:auto; cursor:pointer;">
+                ✗ Reject
+              </button>
+            `
+            : `<p style="margin-top:6px; font-size:0.75rem; color:${s.status === 'approved' ? '#00FF88' : '#ff6666'}; text-transform:uppercase; font-weight:700;">${s.status}</p>`;
+
+          html += `
+            <div class="video-card admin-card" style="margin-bottom:10px;">
+              <div class="card-info">
+                <p class="video-title">${icon} ${escapeHtmlAdmin(s.title)} <span style="color:#8B949E; font-size:0.72rem;">(${typeLabel} · by ${escapeHtmlAdmin(s.username)})</span></p>
+                ${s.description ? `<p class="video-file">${escapeHtmlAdmin(s.description)}</p>` : ''}
+                ${mediaInfo}
+                ${actions}
+              </div>
+            </div>
+          `;
+        });
+        list.innerHTML = html;
+      } catch (err) {
+        list.innerHTML = '<p style="color:#ff6666; font-size:0.82rem;">Couldn\'t load submissions.</p>';
+      }
+    }
+
+    async function reviewSubmission(id, action) {
+      let adminNote = '';
+      if (action === 'reject') {
+        adminNote = prompt('Optional reason for rejection:') || '';
+      }
+      const res  = await authFetch('/api/reviewsubmission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action, admin_note: adminNote })
+      });
+      const data = await res.json();
+      if (data.success) {
+        loadSubmissions();
+        loadVideos();
+      } else {
+        alert(data.message || 'Action failed.');
+      }
+    }
+
+    function escapeHtmlAdmin(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+
+    loadSubmissions();
     loadVideos();
   </script>
 
