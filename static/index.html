@@ -28,12 +28,25 @@
         </div>
       </div>
       <a href="/top.html" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; text-decoration:none; border-bottom:1px solid #30363D; font-size:0.85rem;">🏆 Top Videos</a>
+      <div onclick="checkAgeGate()" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; cursor:pointer; border-bottom:1px solid #30363D; font-size:0.85rem;">🔞 18+ Corner</div>
       <a href="/settings.html" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; text-decoration:none; font-size:0.85rem;">⚙️ Settings</a>
       <div onclick="logout()" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#ff6666; cursor:pointer; font-size:0.85rem;">🚪 Logout</div>
     </div>
   </nav>
 
-  <!-- VIDEO PLAYER (hidden by default) -->
+  <!-- AGE VERIFICATION MODAL -->
+  <div id="ageGateOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; align-items:center; justify-content:center;">
+    <div style="background:#1C2333; border:1px solid #30363D; border-radius:14px; padding:28px 24px; max-width:340px; text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:12px;">🔞</div>
+      <p style="font-size:1.1rem; font-weight:700; margin-bottom:10px;">Are you 18 or older?</p>
+      <p style="font-size:0.8rem; color:#8B949E; margin-bottom:20px;">This section contains adult content not suitable for minors.</p>
+      <div style="display:flex; gap:10px;">
+        <button onclick="confirmAge(false)" style="flex:1; background:#1C2333; border:1px solid #30363D; color:#fff; border-radius:8px; padding:12px; font-size:0.9rem; cursor:pointer;">No</button>
+        <button onclick="confirmAge(true)" style="flex:1; background:#00D4FF; border:none; color:#000; border-radius:8px; padding:12px; font-size:0.9rem; font-weight:700; cursor:pointer;">Yes, I'm 18+</button>
+      </div>
+    </div>
+  </div>
+
   <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
     <div id="playerWrap" style="position:relative; background:#000;" onclick="onPlayerTap(event)">
@@ -963,6 +976,20 @@
     const savedGrid = localStorage.getItem('gridSize') || '2';
     setGrid(savedGrid);
 
+    function checkAgeGate() {
+      hideMenu();
+      document.getElementById('ageGateOverlay').style.display = 'flex';
+    }
+
+    function confirmAge(isAdult) {
+      document.getElementById('ageGateOverlay').style.display = 'none';
+      if (isAdult) {
+        sessionStorage.setItem('ageVerified', 'true');
+        window.location.href = '/adult.html';
+      }
+      // If "No", just close the modal, nothing else happens
+    }
+
     function toggleMenu() {
       const menu = document.getElementById('dropMenu');
       menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
@@ -1225,7 +1252,19 @@
       loadComments(videoUrl, listElId);
     }
 
-    loadVideos();
+    loadVideos().then(function() {
+      const jump = sessionStorage.getItem('jumpToVideo');
+      if (jump) {
+        sessionStorage.removeItem('jumpToVideo');
+        const v = JSON.parse(jump);
+        if (v.type === 'series') {
+          const fullVideo = allVideos.find(function(x) { return (x.filename || x.title) === (v.filename || v.title); });
+          if (fullVideo) openSeries(fullVideo);
+        } else {
+          playVideo(v.url, v.title, v.category, v.tags);
+        }
+      }
+    });
   </script>
 
 </body>

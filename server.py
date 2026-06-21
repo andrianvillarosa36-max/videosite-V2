@@ -226,6 +226,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.serve_file(os.path.join(STATIC_DIR, 'profile.html'), 'text/html')
         elif path == '/reorder.html':
             self.serve_file(os.path.join(STATIC_DIR, 'reorder.html'), 'text/html')
+        elif path == '/adult.html':
+            self.serve_file(os.path.join(STATIC_DIR, 'adult.html'), 'text/html')
         elif path == '/signup.html':
             self.serve_file(os.path.join(STATIC_DIR, 'signup.html'), 'text/html')
 

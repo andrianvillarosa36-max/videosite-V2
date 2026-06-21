@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>18+ Corner</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- AGE GATE CHECK (re-verifies on direct visit/refresh) -->
+  <div id="ageGateOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:999; align-items:center; justify-content:center;">
+    <div style="background:#1C2333; border:1px solid #30363D; border-radius:14px; padding:28px 24px; max-width:340px; text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:12px;">🔞</div>
+      <p style="font-size:1.1rem; font-weight:700; margin-bottom:10px;">Are you 18 or older?</p>
+      <p style="font-size:0.8rem; color:#8B949E; margin-bottom:20px;">This section contains adult content not suitable for minors.</p>
+      <div style="display:flex; gap:10px;">
+        <button onclick="window.location.href='/index.html'" style="flex:1; background:#1C2333; border:1px solid #30363D; color:#fff; border-radius:8px; padding:12px; font-size:0.9rem; cursor:pointer;">No</button>
+        <button onclick="confirmAndStay()" style="flex:1; background:#00D4FF; border:none; color:#000; border-radius:8px; padding:12px; font-size:0.9rem; font-weight:700; cursor:pointer;">Yes, I'm 18+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVBAR -->
+  <nav>
+    <div class="logo" style="color:#ff4477;">🔞 18+ Corner</div>
+    <div class="nav-right">
+      <a href="/index.html" style="color:#00D4FF; font-size:0.82rem; text-decoration:none;">🎬 Main Site</a>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- SEARCH -->
+  <div style="padding:10px 12px; border-bottom:1px solid #30363D;">
+    <div style="display:flex; align-items:center; gap:8px; background:#1C2333; border:1px solid #30363D; border-radius:999px; padding:8px 14px;">
+      <span style="color:#8B949E;">🔍</span>
+      <input type="text" id="searchInput" placeholder="Search videos..." oninput="searchVideos()"
+        style="flex:1; background:none; border:none; color:#fff; font-size:0.85rem; outline:none;" />
+      <span onclick="clearSearch()" style="color:#8B949E; cursor:pointer; font-size:0.85rem;">✕</span>
+    </div>
+  </div>
+
+  <!-- CATEGORY FILTER -->
+  <div id="filterBar" style="display:flex; gap:8px; padding:10px 12px; border-bottom:1px solid #30363D; overflow-x:auto; scrollbar-width:none;">
+    <button onclick="setCategory('All')" id="cat-All" class="grid-btn active">All</button>
+    <button onclick="setCategory('Anime corn')" id="cat-Anime-corn" class="grid-btn">Anime corn</button>
+    <button onclick="setCategory('NTR Anime corn')" id="cat-NTR-Anime-corn" class="grid-btn">NTR Anime corn</button>
+    <button onclick="setCategory('Anime series corn')" id="cat-Anime-series-corn" class="grid-btn">Anime series corn</button>
+    <button onclick="setCategory('Corn')" id="cat-Corn" class="grid-btn">Corn</button>
+  </div>
+
+  <div id="gridSection">
+    <div class="video-grid grid-2" id="videoGrid"></div>
+  </div>
+
+  <script>
+    (function() {
+      const themes = {
+        dark:       { bg:'#0D1117', card:'#1C2333', text:'#ffffff', border:'#30363D', muted:'#8B949E', accent:'#00D4FF' },
+        light:      { bg:'#f0f2f5', card:'#ffffff', text:'#1a1a1a', border:'#dcdfe4', muted:'#6b7280', accent:'#0077ff' },
+        neonred:    { bg:'#0D0508', card:'#1f0a10', text:'#ffe5e8', border:'#3D1018', muted:'#a87c82', accent:'#FF1744' },
+        neonpink:   { bg:'#0D0510', card:'#1f0a1a', text:'#ffe5f5', border:'#3D1030', muted:'#a87c9c', accent:'#FF2D9E' },
+        neongreen:  { bg:'#050D08', card:'#0a1f12', text:'#e5ffe9', border:'#103D1E', muted:'#7ca889', accent:'#00FF66' },
+        neonviolet: { bg:'#0A050D', card:'#160a1f', text:'#f0e5ff', border:'#2A103D', muted:'#947ca8', accent:'#B026FF' }
+      };
+      const name = localStorage.getItem('theme') || 'dark';
+      const t = themes[name];
+      document.documentElement.style.setProperty('--bg', t.bg);
+      document.documentElement.style.setProperty('--card', t.card);
+      document.documentElement.style.setProperty('--text', t.text);
+      document.documentElement.style.setProperty('--border', t.border);
+      document.documentElement.style.setProperty('--muted', t.muted);
+      document.documentElement.style.setProperty('--accent', t.accent);
+      document.body.style.background = t.bg;
+      document.body.style.color = t.text;
+    })();
+
+    const user = JSON.parse(sessionStorage.getItem('user') || 'null');
+    if (!user) window.location.href = '/login.html';
+
+    const token = sessionStorage.getItem('token');
+    function authFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, options);
+    }
+
+    // Re-check age verification every time this page loads
+    if (sessionStorage.getItem('ageVerified') !== 'true') {
+      document.getElementById('ageGateOverlay').style.display = 'flex';
+    }
+
+    function confirmAndStay() {
+      sessionStorage.setItem('ageVerified', 'true');
+      document.getElementById('ageGateOverlay').style.display = 'none';
+    }
+
+    const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
+    let currentCategory = 'All';
+    let allVideos = [];
+    let allRatings = [];
+    let allFavorites = [];
+
+    async function loadVideos() {
+      const res     = await fetch('/api/videos');
+      const all     = await res.json();
+      allVideos     = all.filter(v => adultCategories.includes(v.category));
+      const rRes    = await fetch('/api/ratings');
+      allRatings    = await rRes.json();
+      const fRes    = await fetch('/api/favorites?username=' + user.username);
+      const favData = await fRes.json();
+      allFavorites  = favData.map(f => f.videoUrl);
+      renderVideos();
+    }
+
+    function renderVideos() {
+      const grid = document.getElementById('videoGrid');
+      const filtered = currentCategory === 'All'
+        ? allVideos
+        : allVideos.filter(v => v.category === currentCategory);
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<p style="color:#8B949E; padding:16px; grid-column:1/-1;">No videos in this category.</p>';
+        return;
+      }
+
+      grid.innerHTML = '';
+      filtered.forEach(function(v) {
+        const videoUrl = v.type === 'series' ? (v.filename || v.title) : (v.url || '');
+        const videoRatings = allRatings.filter(function(r) { return r.videoUrl === videoUrl; });
+        const avg = videoRatings.length
+          ? (videoRatings.reduce(function(a,b) { return a + b.rating; }, 0) / videoRatings.length).toFixed(1)
+          : null;
+
+        let stars = '';
+        const fullStars = avg ? Math.round(avg) : 0;
+        for (let s = 1; s <= 5; s++) {
+          stars += '<span style="font-size:1rem; color:' + (s <= fullStars ? '#FFD700' : '#30363D') + ';">★</span>';
+        }
+
+        const isFav = allFavorites.includes(videoUrl);
+        const thumbStyle = v.thumb ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;' : '';
+
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        card.innerHTML =
+          '<div class="thumbnail" style="' + thumbStyle + '">' +
+            (v.type === 'series' ? '<div class="thumb-badge">📺 ' + (v.episodes ? v.episodes.length : 0) + ' Eps</div>' : '<div class="thumb-badge">▶</div>') +
+            '<div class="thumb-category" style="background:#ff4477;">' + v.category + '</div>' +
+            '<div class="thumb-overlay">' +
+              '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
+                '<div class="thumb-title" style="flex:1;">' + v.title + '</div>' +
+                '<span style="cursor:default;">' + (isFav ? '❤️' : '🤍') + '</span>' +
+              '</div>' +
+              '<div style="display:flex; gap:2px; margin-top:4px;">' + stars + '</div>' +
+            '</div>' +
+          '</div>';
+
+        card.addEventListener('click', function() {
+          sessionStorage.setItem('jumpToVideo', JSON.stringify(v));
+          window.location.href = '/index.html';
+        });
+
+        grid.appendChild(card);
+      });
+    }
+
+    function setCategory(cat) {
+      currentCategory = cat;
+      document.querySelectorAll('[id^="cat-"]').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById('cat-' + cat.replace(/ /g, '-'));
+      if (btn) btn.classList.add('active');
+      renderVideos();
+    }
+
+    function searchVideos() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      if (!q) { renderVideos(); return; }
+      const filtered = allVideos.filter(v => v.title.toLowerCase().includes(q));
+      const grid = document.getElementById('videoGrid');
+      grid.innerHTML = '';
+      filtered.forEach(function(v) {
+        const thumbStyle = v.thumb ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;' : '';
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        card.innerHTML = '<div class="thumbnail" style="' + thumbStyle + '"><div class="thumb-overlay"><div class="thumb-title">' + v.title + '</div></div></div>';
+        card.addEventListener('click', function() {
+          sessionStorage.setItem('jumpToVideo', JSON.stringify(v));
+          window.location.href = '/index.html';
+        });
+        grid.appendChild(card);
+      });
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = '';
+      renderVideos();
+    }
+
+    function logout() {
+      authFetch('/api/logout', { method: 'POST' }).catch(function() {});
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      window.location.href = '/login.html';
+    }
+
+    loadVideos();
+  </script>
+
+</body>
+</html>
