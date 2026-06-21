@@ -745,20 +745,7 @@
       const disCount   = videoLikes.filter(function(l) { return l.action === 'dislike'; }).length;
       const myLike     = allLikes.find(function(l) { return l.videoUrl === url && l.username === user.username; });
 
-      const myRatingNow = allRatings.find(function(r) { return r.videoUrl === url && r.username === user.username; });
-      const isFavNow     = allFavorites.includes(url);
-
-      let playerStars = '';
-      for (let s = 1; s <= 5; s++) {
-        const color = myRatingNow && myRatingNow.rating >= s ? '#FFD700' : '#30363D';
-        playerStars += '<span onclick="rateVideo(\'' + url.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + color + ';">★</span>';
-      }
-
-      likeBar.innerHTML =
-        '<button onclick="toggleLike(\'' + url.replace(/'/g,"\\'") + '\',\'like\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'like' ? '#00D4FF' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'like' ? '#00D4FF' : '#30363D') + '; color:' + (myLike && myLike.action === 'like' ? '#000' : '#fff') + '; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👍 ' + likeCount + '</button>' +
-        '<button onclick="toggleLike(\'' + url.replace(/'/g,"\\'") + '\',\'dislike\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👎 ' + disCount + '</button>' +
-        '<span onclick="event.stopPropagation(); toggleFav(\'' + url.replace(/'/g,"\\'") + '\')" style="cursor:pointer; font-size:1.3rem; margin-left:4px;">' + (isFavNow ? '❤️' : '🤍') + '</span>' +
-        '<span style="display:flex; gap:2px; margin-left:8px;">' + playerStars + '</span>';
+      renderLikeBar(url, url);
 
       // Show related videos
       const related  = document.getElementById('relatedVideos');
@@ -889,21 +876,8 @@
       const disCount2   = videoLikes2.filter(function(l) { return l.action === 'dislike'; }).length;
       const myLike2     = allLikes.find(function(l) { return l.videoUrl === ep.url && l.username === user.username; });
 
-      const seriesId      = currentSeries.filename || currentSeries.title;
-      const myRatingSeries = allRatings.find(function(r) { return r.videoUrl === seriesId && r.username === user.username; });
-      const isFavSeries    = allFavorites.includes(seriesId);
-
-      let seriesStars = '';
-      for (let s = 1; s <= 5; s++) {
-        const color = myRatingSeries && myRatingSeries.rating >= s ? '#FFD700' : '#30363D';
-        seriesStars += '<span onclick="rateVideo(\'' + seriesId.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + color + ';">★</span>';
-      }
-
-      likeBar2.innerHTML =
-        '<button onclick="toggleLike(\'' + ep.url.replace(/'/g,"\\'") + '\',\'like\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike2 && myLike2.action === 'like' ? '#00D4FF' : '#1C2333') + '; border:1px solid ' + (myLike2 && myLike2.action === 'like' ? '#00D4FF' : '#30363D') + '; color:' + (myLike2 && myLike2.action === 'like' ? '#000' : '#fff') + '; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👍 ' + likeCount2 + '</button>' +
-        '<button onclick="toggleLike(\'' + ep.url.replace(/'/g,"\\'") + '\',\'dislike\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike2 && myLike2.action === 'dislike' ? '#ff4444' : '#1C2333') + '; border:1px solid ' + (myLike2 && myLike2.action === 'dislike' ? '#ff4444' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👎 ' + disCount2 + '</button>' +
-        '<span onclick="event.stopPropagation(); toggleFav(\'' + seriesId.replace(/'/g,"\\'") + '\')" style="cursor:pointer; font-size:1.3rem; margin-left:4px;">' + (isFavSeries ? '❤️' : '🤍') + '</span>' +
-        '<span style="display:flex; gap:2px; margin-left:8px;">' + seriesStars + '</span>';
+      const seriesId = currentSeries.filename || currentSeries.title;
+      renderLikeBar(ep.url, seriesId);
 
       // Show episode list below player
       const epSection = document.getElementById('episodeSection');
@@ -1122,16 +1096,46 @@
         allFavorites = allFavorites.filter(function(u) { return u !== videoUrl; });
       }
 
-      // If the player or series page is open, update the heart icon in place
-      const playerHeart = document.querySelector('#likeBar span[onclick*="toggleFav"]');
-      if (playerHeart) playerHeart.textContent = data.favorited ? '❤️' : '🤍';
+      // If the player or series page is open, re-render the whole bar so heart, stars, and like/dislike stay in sync
+      const playerOpen = document.getElementById('playerSection').style.display === 'block';
+      const seriesOpen = document.getElementById('seriesSection').style.display === 'block';
+      if (playerOpen && window._currentVideoUrl) {
+        renderLikeBar(window._currentVideoUrl, window._currentVideoUrl);
+      } else if (seriesOpen && window._currentVideoUrl && window._currentSeriesId) {
+        renderLikeBar(window._currentVideoUrl, window._currentSeriesId);
+      }
 
-      if (document.getElementById('playerSection').style.display !== 'block' &&
-          document.getElementById('seriesSection').style.display !== 'block') {
+      if (!playerOpen && !seriesOpen) {
         loadVideos();
       } else {
         renderRatedRows();
       }
+    }
+
+    let currentLikeBarFavId = null;
+
+    function renderLikeBar(videoUrl, favId) {
+      currentLikeBarFavId = favId;
+      const likeBar     = document.getElementById('likeBar');
+      const videoLikes  = allLikes.filter(function(l) { return l.videoUrl === videoUrl; });
+      const likeCount   = videoLikes.filter(function(l) { return l.action === 'like'; }).length;
+      const disCount    = videoLikes.filter(function(l) { return l.action === 'dislike'; }).length;
+      const myLike      = allLikes.find(function(l) { return l.videoUrl === videoUrl && l.username === user.username; });
+
+      const myRatingNow = allRatings.find(function(r) { return r.videoUrl === favId && r.username === user.username; });
+      const isFavNow     = allFavorites.includes(favId);
+
+      let starsHtml = '';
+      for (let s = 1; s <= 5; s++) {
+        const color = myRatingNow && myRatingNow.rating >= s ? '#FFD700' : '#30363D';
+        starsHtml += '<span onclick="rateVideo(\'' + favId.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + color + ';">★</span>';
+      }
+
+      likeBar.innerHTML =
+        '<button onclick="toggleLike(\'' + videoUrl.replace(/'/g,"\\'") + '\',\'like\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'like' ? '#00D4FF' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'like' ? '#00D4FF' : '#30363D') + '; color:' + (myLike && myLike.action === 'like' ? '#000' : '#fff') + '; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👍 ' + likeCount + '</button>' +
+        '<button onclick="toggleLike(\'' + videoUrl.replace(/'/g,"\\'") + '\',\'dislike\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👎 ' + disCount + '</button>' +
+        '<span onclick="event.stopPropagation(); toggleFav(\'' + favId.replace(/'/g,"\\'") + '\')" style="cursor:pointer; font-size:1.3rem; margin-left:4px;">' + (isFavNow ? '❤️' : '🤍') + '</span>' +
+        '<span style="display:flex; gap:2px; margin-left:8px;">' + starsHtml + '</span>';
     }
 
     async function toggleLike(videoUrl, action) {
@@ -1142,16 +1146,7 @@
       });
       const lRes = await fetch('/api/likes');
       allLikes   = await lRes.json();
-
-      const videoLikes = allLikes.filter(function(l) { return l.videoUrl === videoUrl; });
-      const likeCount  = videoLikes.filter(function(l) { return l.action === 'like'; }).length;
-      const disCount   = videoLikes.filter(function(l) { return l.action === 'dislike'; }).length;
-      const myLike     = allLikes.find(function(l) { return l.videoUrl === videoUrl && l.username === user.username; });
-
-      const likeBar = document.getElementById('likeBar');
-      likeBar.innerHTML =
-        '<button onclick="toggleLike(\'' + videoUrl.replace(/'/g,"\\'") + '\',\'like\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'like' ? '#00D4FF' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'like' ? '#00D4FF' : '#30363D') + '; color:' + (myLike && myLike.action === 'like' ? '#000' : '#fff') + '; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👍 ' + likeCount + '</button>' +
-        '<button onclick="toggleLike(\'' + videoUrl.replace(/'/g,"\\'") + '\',\'dislike\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👎 ' + disCount + '</button>';
+      renderLikeBar(videoUrl, currentLikeBarFavId || videoUrl);
     }
 
     function renderRatedRows() {
