@@ -625,7 +625,7 @@
         let stars = '';
         const fullStars = avg ? Math.round(avg) : 0;
         for (let s = 1; s <= 5; s++) {
-          stars += '<span style="font-size:1rem; color:' + (s <= fullStars ? '#FFD700' : '#30363D') + ';">★</span>';
+          stars += '<span class="rate-star" style="color:' + (s <= fullStars ? '#FFD700' : '#30363D') + ';">★</span>';
         }
 
         const isFav = allFavorites.includes(videoUrl);
@@ -646,7 +646,7 @@
             '<div class="thumb-overlay">' +
               '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
                 '<div class="thumb-title" style="flex:1;">' + v.title + '</div>' +
-                '<span style="cursor:default;">' + (isFav ? '❤️' : '🤍') + '</span>' +
+                '<span class="fav-heart" style="cursor:default;">' + (isFav ? '❤️' : '🤍') + '</span>' +
               '</div>' +
               '<div style="display:flex; gap:2px; margin-top:4px;">' + stars + '</div>' +
               (continu ? '<div style="background:rgba(0,0,0,0.5); border-radius:999px; height:4px; margin-top:6px; overflow:hidden;"><div style="background:#ff4477; height:100%; width:' + pct + '%;"></div></div>' : '') +
