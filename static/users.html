@@ -232,7 +232,15 @@
       });
     }
 
-const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
+    function toggleSection(id) {
+      const box   = document.getElementById(id);
+      const arrow = document.getElementById(id + 'Arrow');
+      const isHidden = box.style.display === 'none';
+      box.style.display = isHidden ? 'block' : 'none';
+      arrow.textContent = isHidden ? '▴' : '▾';
+    }
+
+    const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
 
     function getVideoId(v) {
       return v.type === 'series' ? (v.filename || v.title) : v.url;
@@ -310,7 +318,6 @@ const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'C
       buildFavGrid(document.getElementById('mFavAdult'), favUrls, videos, function(v) { return adultCategories.includes(v.category); });
       buildRatingsList(document.getElementById('mRatings'), myRatings, videos, function(v) { return !adultCategories.includes(v.category); });
       buildRatingsList(document.getElementById('mRatingsAdult'), myRatings, videos, function(v) { return adultCategories.includes(v.category); });
-      }
 
       document.getElementById('modalOverlay').classList.add('open');
     }
