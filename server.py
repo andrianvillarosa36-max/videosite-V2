@@ -14,9 +14,6 @@ import psycopg2.pool
 import urllib.request
 import uuid
 
-online_users = {}
-sessions = {}  # token -> { 'username': ..., 'role': ..., 'created': ... }
-
 SESSION_LIFETIME = timedelta(hours=12)
 
 VIDEO_DIR  = 'videos'
@@ -73,7 +70,11 @@ def db_cursor():
 
 def create_session(username, role):
     token = secrets.token_hex(32)
-    sessions[token] = {'username': username, 'role': role, 'created': datetime.now()}
+    with db_cursor() as (conn, cur):
+        cur.execute(
+            'INSERT INTO sessions (token, username, role) VALUES (%s, %s, %s)',
+            (token, username, role)
+        )
     return token
 
 def get_session(self):
@@ -81,13 +82,15 @@ def get_session(self):
     if not auth.startswith('Bearer '):
         return None
     token = auth[7:]
-    session = sessions.get(token)
-    if not session:
-        return None
-    if datetime.now() - session.get('created', datetime.now()) > SESSION_LIFETIME:
-        del sessions[token]
-        return None
-    return session
+    with db_cursor() as (conn, cur):
+        cur.execute('SELECT * FROM sessions WHERE token = %s', (token,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        if datetime.now() - row['created_at'] > SESSION_LIFETIME:
+            cur.execute('DELETE FROM sessions WHERE token = %s', (token,))
+            return None
+        return {'username': row['username'], 'role': row['role'], 'created': row['created_at']}
 
 def require_auth(self):
     session = get_session(self)
@@ -112,10 +115,9 @@ def require_admin(self):
     return session
 
 def cleanup_sessions():
-    now = datetime.now()
-    expired = [t for t, s in sessions.items() if now - s.get('created', now) > SESSION_LIFETIME]
-    for t in expired:
-        del sessions[t]
+    cutoff = datetime.now() - SESSION_LIFETIME
+    with db_cursor() as (conn, cur):
+        cur.execute('DELETE FROM sessions WHERE created_at < %s', (cutoff,))
 
 def safe_join(base_dir, filename):
     filename = os.path.basename(filename)
@@ -609,8 +611,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             auth = self.headers.get('Authorization', '')
             if auth.startswith('Bearer '):
                 token = auth[7:]
-                if token in sessions:
-                    del sessions[token]
+                with db_cursor() as (conn, cur):
+                    cur.execute('DELETE FROM sessions WHERE token = %s', (token,))
             self.send_json({'success': True})
 
         elif path == '/api/addreaction':
@@ -1041,6 +1043,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     ensure_schema()
+    cleanup_sessions()
     port = int(os.environ.get('PORT', 8080))
     print(f'Server running on port {port}')
     http.server.HTTPServer(('0.0.0.0', port), Handler).serve_forever()
