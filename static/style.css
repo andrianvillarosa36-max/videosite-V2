@@ -404,3 +404,93 @@ nav .logo { font-size: 1.2rem; color: var(--accent); }
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* ===== BOTTOM NAVIGATION BAR ===== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 998;
+}
+
+.bnav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--muted);
+  cursor: pointer;
+  flex: 1;
+  font-size: 0.7rem;
+  user-select: none;
+}
+
+.bnav-item .bnav-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.bnav-item.active {
+  color: var(--accent);
+}
+
+/* push page content up so the fixed bottom bar doesn't cover it */
+body {
+  padding-bottom: 76px;
+}
+
+/* ===== SLIDE-OUT "MORE" PANEL ===== */
+.more-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.more-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.more-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 250px;
+  max-width: 80vw;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  overflow-y: auto;
+  padding-top: 20px;
+}
+
+.more-panel.open {
+  transform: translateX(0);
+}
+
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+  cursor: pointer;
+}

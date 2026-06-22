@@ -8,32 +8,42 @@
 </head>
 <body>
 
-  <nav>
-    <div class="logo">🌽 AnimeCorn</div>
-    <div class="nav-right">
-      <img src="https://media.tenor.com/mP0SLXgz71QAAAAj/peachcat-cat.gif" style="width:50px; height:50px; border-radius:10px; object-fit:cover;" />
-      <a href="/chat.html" style="color:#00D4FF; font-size:0.82rem; text-decoration:none;">💬 Chat</a>
-      <button class="logout-btn" onclick="toggleMenu()" style="font-size:1.1rem; padding:6px 10px;">☰</button>
+  <!-- BOTTOM NAVIGATION BAR -->
+  <nav class="bottom-nav">
+    <div class="bnav-item active" id="bnav-home" onclick="goHome()">
+      <span class="bnav-icon">🏠</span>
+      <span class="bnav-label">Home</span>
     </div>
-
-    <div id="dropMenu" style="display:none; position:absolute; top:70px; right:12px; background:#1C2333; border:1px solid #30363D; border-radius:12px; z-index:999; min-width:160px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.5);">
-      <a href="/profile.html" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; text-decoration:none; border-bottom:1px solid #30363D; font-size:0.85rem;">👤 Profile</a>
-      <a href="/users.html" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; text-decoration:none; border-bottom:1px solid #30363D; font-size:0.85rem;">👥 Users</a>
-      <div onclick="toggleGridMenu()" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; cursor:pointer; border-bottom:1px solid #30363D; font-size:0.85rem;">🔲 Grid Size</div>
-      <div id="gridSubMenu" style="display:none; background:#0D1117; padding:8px 16px; border-bottom:1px solid #30363D;">
-        <div style="display:flex; gap:8px;">
-          <button onclick="setGrid('2'); hideMenu();" class="grid-btn">2×3</button>
-          <button onclick="setGrid('3'); hideMenu();" class="grid-btn">3×4</button>
-          <button onclick="setGrid('4'); hideMenu();" class="grid-btn">4×5</button>
-        </div>
-      </div>
-      <a href="/top.html" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; text-decoration:none; border-bottom:1px solid #30363D; font-size:0.85rem;">🏆 Top Videos</a>
-      <div onclick="checkAgeGate()" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; cursor:pointer; border-bottom:1px solid #30363D; font-size:0.85rem;">🔞 18+ Corner</div>
-      <a href="/submit.html" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; text-decoration:none; border-bottom:1px solid #30363D; font-size:0.85rem;">📤 Suggest / Upload</a>
-      <a href="/settings.html" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#fff; text-decoration:none; font-size:0.85rem;">⚙️ Settings</a>
-      <div onclick="logout()" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:#ff6666; cursor:pointer; font-size:0.85rem;">🚪 Logout</div>
+    <div class="bnav-item" id="bnav-fav" onclick="goFavourites()">
+      <span class="bnav-icon">❤️</span>
+      <span class="bnav-label">Favourites</span>
+    </div>
+    <div class="bnav-item" onclick="window.location.href='/menu.html'">
+      <span class="bnav-icon">👤</span>
+      <span class="bnav-label">Menu</span>
+    </div>
+    <div class="bnav-item" onclick="toggleMorePanel()">
+      <span class="bnav-icon">☰</span>
+      <span class="bnav-label">More</span>
     </div>
   </nav>
+
+  <!-- SLIDE-OUT "MORE" PANEL -->
+  <div id="moreOverlay" class="more-overlay" onclick="closeMorePanel()"></div>
+  <div id="morePanel" class="more-panel">
+    <a href="/submit.html" class="more-item">📤 Suggest / Upload</a>
+    <a href="/top.html" class="more-item">🏆 Top Videos</a>
+    <a href="/users.html" class="more-item">👥 Users</a>
+    <div class="more-item" onclick="toggleGridMenu()">🔲 Grid Size</div>
+    <div id="gridSubMenu" style="display:none; background:#0D1117; padding:8px 16px; border-bottom:1px solid #30363D;">
+      <div style="display:flex; gap:8px;">
+        <button onclick="setGrid('2'); hideMenu();" class="grid-btn">2×3</button>
+        <button onclick="setGrid('3'); hideMenu();" class="grid-btn">3×4</button>
+        <button onclick="setGrid('4'); hideMenu();" class="grid-btn">4×5</button>
+      </div>
+    </div>
+    <div class="more-item" onclick="checkAgeGate()">🔞 18+ Corner</div>
+  </div>
 
   <!-- AGE VERIFICATION MODAL -->
   <div id="ageGateOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; align-items:center; justify-content:center;">
@@ -987,13 +997,35 @@
       // If "No", just close the modal, nothing else happens
     }
 
-    function toggleMenu() {
-      const menu = document.getElementById('dropMenu');
-      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    function goHome() {
+      setCategory('All');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setActiveBnav('bnav-home');
+    }
+
+    function goFavourites() {
+      setCategory('Favorites');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setActiveBnav('bnav-fav');
+    }
+
+    function setActiveBnav(id) {
+      document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('active'));
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active');
+    }
+
+    function toggleMorePanel() {
+      document.getElementById('morePanel').classList.toggle('open');
+      document.getElementById('moreOverlay').classList.toggle('open');
+    }
+
+    function closeMorePanel() {
+      document.getElementById('morePanel').classList.remove('open');
+      document.getElementById('moreOverlay').classList.remove('open');
     }
 
     function hideMenu() {
-      document.getElementById('dropMenu').style.display = 'none';
       document.getElementById('gridSubMenu').style.display = 'none';
     }
 
@@ -1001,15 +1033,6 @@
       const sub = document.getElementById('gridSubMenu');
       sub.style.display = sub.style.display === 'none' ? 'block' : 'none';
     }
-
-    // Close menu when tapping outside
-    document.addEventListener('click', function(e) {
-      const menu = document.getElementById('dropMenu');
-      const btn  = document.querySelector('.logout-btn');
-      if (menu && btn && !menu.contains(e.target) && e.target !== btn) {
-        hideMenu();
-      }
-    });
 
     function searchVideos() {
       const q = document.getElementById('searchInput').value.toLowerCase().trim();
