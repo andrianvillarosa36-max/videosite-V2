@@ -1034,7 +1034,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = self.path
         time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         try:
-            with open('data/access_log.txt', 'a') as f:
+            log_path = 'data/access_log.txt'
+            MAX_LOG_SIZE = 2 * 1024 * 1024  # 2MB cap
+            if os.path.exists(log_path) and os.path.getsize(log_path) > MAX_LOG_SIZE:
+                with open(log_path, 'r') as f:
+                    lines = f.readlines()
+                with open(log_path, 'w') as f:
+                    f.writelines(lines[-2000:])  # keep last 2000 lines
+            with open(log_path, 'a') as f:
                 f.write(f'{time} | {ip} | {path}\n')
         except Exception:
             pass
