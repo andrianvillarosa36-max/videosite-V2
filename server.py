@@ -280,10 +280,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.serve_file(os.path.join(STATIC_DIR, 'signup.html'), 'text/html')
         elif path == '/submit.html':
             self.serve_file(os.path.join(STATIC_DIR, 'submit.html'), 'text/html')
-        elif path == '/menu.html':
-            self.serve_file(os.path.join(STATIC_DIR, 'menu.html'), 'text/html')
-        elif path == '/adult-menu.html':
-            self.serve_file(os.path.join(STATIC_DIR, 'adult-menu.html'), 'text/html')
 
         elif path == '/api/videos':
             with db_cursor() as (conn, cur):
@@ -370,9 +366,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if not session: return
             with db_cursor() as (conn, cur):
                 cur.execute(
-                    '''SELECT id, kind, title, description, category, type, status, admin_note, created_at
+                    '''SELECT id, kind, title, description, category, type, thumb, status, admin_note, created_at
                        FROM submissions WHERE username = %s ORDER BY created_at DESC''',
                     (session['username'],)
+                )
+                rows = cur.fetchall()
+            self.send_json([dict(r) for r in rows])
+
+        elif path.startswith('/api/useruploads'):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            target_user = qs.get('username', [''])[0]
+            if not target_user:
+                self.send_json([])
+                return
+            with db_cursor() as (conn, cur):
+                cur.execute(
+                    '''SELECT id, kind, title, description, category, type, thumb, created_at
+                       FROM submissions WHERE username = %s AND status = %s ORDER BY created_at DESC''',
+                    (target_user, 'approved')
                 )
                 rows = cur.fetchall()
             self.send_json([dict(r) for r in rows])

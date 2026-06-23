@@ -22,9 +22,9 @@
       <span class="bnav-icon">💬</span>
       <span class="bnav-label">Chat</span>
     </div>
-    <div class="bnav-item" onclick="window.location.href='/menu.html'">
+    <div class="bnav-item" onclick="window.location.href='/profile.html'">
       <span class="bnav-icon">👤</span>
-      <span class="bnav-label">Menu</span>
+      <span class="bnav-label">Profile</span>
     </div>
     <div class="bnav-item" onclick="toggleMorePanel()">
       <span class="bnav-icon">☰</span>
@@ -47,6 +47,8 @@
       </div>
     </div>
     <div class="more-item" onclick="checkAgeGate()">🔞 18+ Corner</div>
+    <a href="/settings.html" class="more-item">⚙️ Settings</a>
+    <div class="more-item logout" onclick="logout()" style="color:#ff6666;">🚪 Logout</div>
   </div>
 
   <!-- AGE VERIFICATION MODAL -->
@@ -1298,6 +1300,12 @@
     }
 
     loadVideos().then(function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const catParam = urlParams.get('cat');
+      if (catParam) {
+        setCategory(catParam);
+      }
+
       const jump = sessionStorage.getItem('jumpToVideo');
       if (jump) {
         sessionStorage.removeItem('jumpToVideo');

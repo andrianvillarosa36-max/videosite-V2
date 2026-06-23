@@ -177,6 +177,8 @@
 </head>
 <body>
 
+  <a href="/index.html" style="display:inline-block; padding:16px 18px 0 18px; color:var(--muted); text-decoration:none; font-size:0.85rem;">← Back</a>
+
   <!-- NAVBAR -->
   <nav>
     <div class="logo">🌽 AnimeCorn</div>
@@ -222,6 +224,42 @@
       <span id="myRatingsArrow">▾</span>
     </h2>
     <div id="myRatings" style="display:none;"></div>
+  </div>
+
+  <!-- APPROVED UPLOADS -->
+  <div class="section">
+    <h2 id="uploadsHeading" onclick="toggleSection('uploads')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+      <span>🎬 My Uploads</span>
+      <span id="uploadsArrow">▾</span>
+    </h2>
+    <div id="uploads" class="uploads-grid" style="display:none;"></div>
+  </div>
+
+  <!-- BOTTOM NAVIGATION BAR -->
+  <nav class="bottom-nav">
+    <div class="bnav-item" onclick="window.location.href='/index.html'">
+      <span class="bnav-icon">🏠</span>
+      <span class="bnav-label">Home</span>
+    </div>
+    <div class="bnav-item" onclick="window.location.href='/index.html?cat=Favorites'">
+      <span class="bnav-icon">❤️</span>
+      <span class="bnav-label">Favourites</span>
+    </div>
+    <div class="bnav-item active" id="bnav-profile">
+      <span class="bnav-icon">👤</span>
+      <span class="bnav-label">Profile</span>
+    </div>
+    <div class="bnav-item" onclick="toggleMorePanel()">
+      <span class="bnav-icon">☰</span>
+      <span class="bnav-label">More</span>
+    </div>
+  </nav>
+
+  <!-- SLIDE-OUT "MORE" PANEL -->
+  <div id="moreOverlay" class="more-overlay" onclick="closeMorePanel()"></div>
+  <div id="morePanel" class="more-panel">
+    <a href="/settings.html" class="more-item">⚙️ Settings</a>
+    <div class="more-item logout" onclick="logout()" style="color:#ff6666;">🚪 Logout</div>
   </div>
 
   <script>
@@ -479,6 +517,29 @@
     renderProfile();
     loadTopRated();
     loadMyRatings();
+    loadUploads();
+
+    async function loadUploads() {
+      const box = document.getElementById('uploads');
+      try {
+        const res = await fetch('/api/useruploads?username=' + encodeURIComponent(targetUsername));
+        const uploads = await res.json();
+
+        if (!uploads.length) {
+          box.innerHTML = `<p class="uploads-empty">No approved uploads yet.</p>`;
+          return;
+        }
+
+        box.innerHTML = uploads.map(u => `
+          <div class="upload-card">
+            <img src="${escapeHTML(u.thumb || '')}" loading="lazy" alt="${escapeHTML(u.title || '')}" onerror="this.style.display='none'">
+            <div class="upload-title">${escapeHTML(u.title || 'Untitled')}</div>
+          </div>
+        `).join('');
+      } catch (e) {
+        box.innerHTML = `<p class="uploads-empty">Couldn't load uploads.</p>`;
+      }
+    }
   </script>
 
 </body>
