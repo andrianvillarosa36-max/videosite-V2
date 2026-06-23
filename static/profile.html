@@ -582,6 +582,19 @@
       window.location.href = '/login.html';
     }
 
+    function goHomeFromProfile() {
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get('from');
+      window.location.href = (from === 'adult') ? '/adult.html' : '/index.html';
+    }
+
+    function goFavouritesFromProfile() {
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get('from');
+      const target = (from === 'adult') ? '/adult.html' : '/index.html';
+      window.location.href = target + '?cat=Favorites';
+    }
+
     function toggleMorePanel() {
       document.getElementById('morePanel').classList.toggle('open');
       document.getElementById('moreOverlay').classList.toggle('open');
