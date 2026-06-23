@@ -23,15 +23,15 @@
 
   <!-- BOTTOM NAVIGATION BAR -->
   <nav class="bottom-nav">
-    <div class="bnav-item active" id="bnav-home" onclick="goHome()">
+    <div class="bnav-item" id="bnav-home-link" onclick="goHomeFromProfile()">
       <span class="bnav-icon">🏠</span>
       <span class="bnav-label">Home</span>
     </div>
-    <div class="bnav-item" id="bnav-fav" onclick="goFavourites()">
+    <div class="bnav-item" id="bnav-fav-link" onclick="goFavouritesFromProfile()">
       <span class="bnav-icon">❤️</span>
       <span class="bnav-label">Favourites</span>
     </div>
-    <div class="bnav-item" onclick="window.location.href='/profile.html'">
+    <div class="bnav-item" onclick="window.location.href='/profile.html?from=adult'">
       <span class="bnav-icon">👤</span>
       <span class="bnav-label">Profile</span>
     </div>
@@ -813,6 +813,19 @@
       if (el) el.classList.add('active');
     }
 
+    function goHomeFromProfile() {
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get('from');
+      window.location.href = (from === 'adult') ? '/adult.html' : '/index.html';
+    }
+
+    function goFavouritesFromProfile() {
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get('from');
+      const target = (from === 'adult') ? '/adult.html' : '/index.html';
+      window.location.href = target + '?cat=Favorites';
+    }
+
     function toggleMorePanel() {
       document.getElementById('morePanel').classList.toggle('open');
       document.getElementById('moreOverlay').classList.toggle('open');
@@ -842,8 +855,13 @@
     const savedGrid = localStorage.getItem('gridSize') || '2';
     setGrid(savedGrid);
 
-    loadVideos();
-  </script>
+    loadVideos().then(function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const catParam = urlParams.get('cat');
+      if (catParam) {
+        setCategory(catParam);
+      }
+    });	
   </script>
 
 </body>
