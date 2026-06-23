@@ -134,13 +134,66 @@
     .star.filled { color: #FFD700; }
     .star.empty  { color: #30363D; }
 
-    .rated-card {
+    .rating-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .grid-box {
       background: #1C2333;
       border: 1px solid #30363D;
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 10px;
+      border-radius: 8px;
+      padding: 6px;
       cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+    }
+
+    .grid-box .grid-box-title {
+      font-size: 0.62rem;
+      color: #fff;
+      line-height: 1.15;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .grid-box .grid-box-stars {
+      font-size: 0.55rem;
+      margin-top: 3px;
+      color: #00D4FF;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .page-btn {
+      background: #1C2333;
+      border: 1px solid #30363D;
+      color: #fff;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .page-btn.active {
+      background: #00D4FF;
+      border-color: #00D4FF;
+      color: #000;
+      font-weight: 700;
     }
 
     .rated-title {
@@ -209,7 +262,8 @@
       <span>⭐ My Ratings</span>
       <span id="topRatedArrow">▾</span>
     </h2>
-    <div id="topRated" style="display:none;"></div>
+    <div id="topRated" class="rating-grid" style="display:none;"></div>
+    <div id="topRatedPagination" class="pagination"></div>
   </div>
 
   <!-- 18+ CORNER RATINGS -->
@@ -218,7 +272,8 @@
       <span>🔞 My 18+ Corner Ratings</span>
       <span id="myRatingsArrow">▾</span>
     </h2>
-    <div id="myRatings" style="display:none;"></div>
+    <div id="myRatings" class="rating-grid" style="display:none;"></div>
+    <div id="myRatingsPagination" class="pagination"></div>
   </div>
 
   <!-- APPROVED UPLOADS -->
@@ -227,7 +282,8 @@
       <span>🎬 My Uploads</span>
       <span id="uploadsArrow">▾</span>
     </h2>
-    <div id="uploads" class="uploads-grid" style="display:none;"></div>
+    <div id="uploads" class="rating-grid" style="display:none;"></div>
+    <div id="uploadsPagination" class="pagination"></div>
   </div>
 
   <!-- BOTTOM NAVIGATION BAR -->
@@ -403,103 +459,120 @@
     // MODIFIED: Calculates high-score rankings restricted exclusively to this user's dataset
     const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
 
+    let topRatedData = [];
+
     async function loadTopRated() {
       const res     = await fetch('/api/ratings');
       const ratings = await res.json();
       const vRes    = await fetch('/api/videos');
       const videos  = await vRes.json();
-      const box     = document.getElementById('topRated');
 
-      // Filter global telemetry down to only the profile target's interactions,
-      // and only ratings on non-adult (main site) videos
       const targetRatings = ratings.filter(r => {
         if (r.username !== targetUsername) return false;
         const v = videos.find(vv => (vv.type === 'series' ? vv.filename : vv.url) === r.videoUrl);
         return v && !adultCategories.includes(v.category);
       });
 
-      if (targetRatings.length === 0) {
-        box.innerHTML = `<p style="color:#8B949E;">No high ratings registered yet.</p>`;
-        return;
-      }
-
-      // Map and match actual video metadata blocks to user score inputs 
-      const ranked = targetRatings
+      topRatedData = targetRatings
         .map(r => {
           const videoInfo = videos.find(v => (v.type === 'series' ? v.filename : v.url) === r.videoUrl);
-          return {
-            ...videoInfo,
-            personalScore: r.rating
-          };
+          return { ...videoInfo, personalScore: r.rating };
         })
-        .filter(v => v.title) // Ensure structural safety if a video was purged from endpoints
-        .sort((a, b) => b.personalScore - a.personalScore); // Show all ratings, highest first
+        .filter(v => v.title)
+        .sort((a, b) => b.personalScore - a.personalScore);
 
-      box.innerHTML = '';
-      ranked.forEach(v => {
-        box.innerHTML += `
-          <div class="rated-card" onclick="window.location.href='/index.html'">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <div class="rated-title">${escapeHTML(v.title)}</div>
-                <div class="rated-category">${escapeHTML(v.category || 'Uncategorized')}</div>
-              </div>
-              <div>
-                 ${starsHtml(v.personalScore)}
-              </div>
-            </div>
-          </div>
-        `;
-      });
+      renderTopRatedPage();
     }
+
+    function renderTopRatedPage() {
+      renderPaginatedGrid('topRated', topRatedData, v => `
+        <div class="grid-box" onclick="window.location.href='/index.html'">
+          <div class="grid-box-title">${escapeHTML(v.title)}</div>
+          <div class="grid-box-stars">${'★'.repeat(v.personalScore)}</div>
+        </div>
+      `);
+    }
+
+    let myRatingsData = [];
 
     async function loadMyRatings() {
       const res     = await fetch('/api/ratings');
       const ratings = await res.json();
       const vRes    = await fetch('/api/videos');
       const videos  = await vRes.json();
-      const box     = document.getElementById('myRatings');
 
-      // Only ratings on adult (18+ Corner) videos
       const mine = ratings.filter(r => {
         if (r.username !== targetUsername) return false;
         const v = videos.find(vv => (vv.type === 'series' ? vv.filename : vv.url) === r.videoUrl);
         return v && adultCategories.includes(v.category);
       });
 
-      if (mine.length === 0) {
-        box.innerHTML = `<p style="color:#8B949E;">No interactions found.</p>`;
-        return;
-      }
+      myRatingsData = mine
+        .map(r => {
+          const v = videos.find(vv => (vv.type === 'series' ? vv.filename : vv.url) === r.videoUrl);
+          return v ? { ...v, personalScore: r.rating } : null;
+        })
+        .filter(v => v);
 
-      box.innerHTML = '';
-      let renderedCount = 0;
+      renderMyRatingsPage();
+    }
 
-      mine.forEach(r => {
-        const v = videos.find(v => (v.type === 'series' ? v.filename : v.url) === r.videoUrl);
-        if (!v) return;
-        
-        renderedCount++;
-        box.innerHTML += `
-          <div class="rated-card">
-            <div class="rated-title">${escapeHTML(v.title)}</div>
-            <div class="rated-category">${escapeHTML(v.category || 'Uncategorized')}</div>
-            ${starsHtml(r.rating)}
-          </div>
-        `;
-      });
-
-      if (renderedCount === 0) {
-        box.innerHTML = `<p style="color:#8B949E;">No historical data compiled.</p>`;
-      }
+    function renderMyRatingsPage() {
+      renderPaginatedGrid('myRatings', myRatingsData, v => `
+        <div class="grid-box">
+          <div class="grid-box-title">${escapeHTML(v.title)}</div>
+          <div class="grid-box-stars">${'★'.repeat(v.personalScore)}</div>
+        </div>
+      `);
     }
 
     function toggleSection(id) {
       const box   = document.getElementById(id);
       const arrow = document.getElementById(id + 'Arrow');
       const isHidden = box.style.display === 'none';
-      box.style.display = isHidden ? 'block' : 'none';
+      box.style.display = isHidden ? 'grid' : 'none';
       arrow.textContent = isHidden ? '▴' : '▾';
+    }
+
+    const PAGE_SIZE = 20;
+    const pageState = {};
+
+    function renderPaginatedGrid(boxId, items, renderItemFn) {
+      const box   = document.getElementById(boxId);
+      const pager = document.getElementById(boxId + 'Pagination');
+
+      if (!items.length) {
+        box.innerHTML = `<p style="color:#8B949E; grid-column: 1 / -1;">Nothing here yet.</p>`;
+        pager.innerHTML = '';
+        return;
+      }
+
+      const totalPages = Math.ceil(items.length / PAGE_SIZE);
+      if (!pageState[boxId] || pageState[boxId] > totalPages) pageState[boxId] = 1;
+      const currentPage = pageState[boxId];
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageItems = items.slice(start, start + PAGE_SIZE);
+
+      box.innerHTML = pageItems.map(renderItemFn).join('');
+
+      if (totalPages <= 1) {
+        pager.innerHTML = '';
+        return;
+      }
+
+      let pagerHtml = '';
+      for (let p = 1; p <= totalPages; p++) {
+        pagerHtml += `<div class="page-btn ${p === currentPage ? 'active' : ''}" onclick="goToPage('${boxId}', ${p})">${p}</div>`;
+      }
+      pager.innerHTML = pagerHtml;
+    }
+
+    function goToPage(boxId, page) {
+      pageState[boxId] = page;
+      if (boxId === 'topRated') renderTopRatedPage();
+      if (boxId === 'myRatings') renderMyRatingsPage();
+      if (boxId === 'uploads') renderUploadsPage();
     }
 
     function logout() {
@@ -509,31 +582,40 @@
       window.location.href = '/login.html';
     }
 
+    function toggleMorePanel() {
+      document.getElementById('morePanel').classList.toggle('open');
+      document.getElementById('moreOverlay').classList.toggle('open');
+    }
+
+    function closeMorePanel() {
+      document.getElementById('morePanel').classList.remove('open');
+      document.getElementById('moreOverlay').classList.remove('open');
+    }
+
     renderProfile();
     loadTopRated();
     loadMyRatings();
     loadUploads();
 
+    let uploadsData = [];
+
     async function loadUploads() {
-      const box = document.getElementById('uploads');
       try {
         const res = await fetch('/api/useruploads?username=' + encodeURIComponent(targetUsername));
-        const uploads = await res.json();
-
-        if (!uploads.length) {
-          box.innerHTML = `<p class="uploads-empty">No approved uploads yet.</p>`;
-          return;
-        }
-
-        box.innerHTML = uploads.map(u => `
-          <div class="upload-card">
-            <img src="${escapeHTML(u.thumb || '')}" loading="lazy" alt="${escapeHTML(u.title || '')}" onerror="this.style.display='none'">
-            <div class="upload-title">${escapeHTML(u.title || 'Untitled')}</div>
-          </div>
-        `).join('');
+        uploadsData = await res.json();
       } catch (e) {
-        box.innerHTML = `<p class="uploads-empty">Couldn't load uploads.</p>`;
+        uploadsData = [];
       }
+      renderUploadsPage();
+    }
+
+    function renderUploadsPage() {
+      renderPaginatedGrid('uploads', uploadsData, u => `
+        <div class="grid-box">
+          ${u.thumb ? `<img src="${escapeHTML(u.thumb)}" loading="lazy" alt="${escapeHTML(u.title || '')}" style="width:100%; height:60%; object-fit:cover; border-radius:4px; margin-bottom:4px;" onerror="this.style.display='none'">` : ''}
+          <div class="grid-box-title">${escapeHTML(u.title || 'Untitled')}</div>
+        </div>
+      `);
     }
   </script>
 

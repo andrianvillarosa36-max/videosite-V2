@@ -242,16 +242,28 @@
       document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
     }
 
-    function toggleOrientation() {
+    async function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
+
       if (!document.fullscreenElement) {
-        wrap.requestFullscreen().then(function() {
-          if (screen.orientation && screen.orientation.lock) {
-            screen.orientation.lock('landscape').catch(function() {});
+        try {
+          await wrap.requestFullscreen();
+        } catch (e) {
+          // ignore, will still try to lock below
+        }
+      }
+
+      if (screen.orientation && screen.orientation.lock) {
+        try {
+          const current = screen.orientation.type || '';
+          if (current.startsWith('landscape')) {
+            await screen.orientation.unlock();
+          } else {
+            await screen.orientation.lock('landscape');
           }
-        }).catch(function() {});
-      } else {
-        if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+        } catch (e) {
+          // some browsers block lock outside fullscreen or unsupported, ignore silently
+        }
       }
     }
 
