@@ -280,6 +280,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.serve_file(os.path.join(STATIC_DIR, 'signup.html'), 'text/html')
         elif path == '/submit.html':
             self.serve_file(os.path.join(STATIC_DIR, 'submit.html'), 'text/html')
+        elif path == '/manifest.json':
+            self.serve_file(os.path.join(STATIC_DIR, 'manifest.json'), 'application/json')
+        elif path == '/icon-512.png':
+            self.serve_file(os.path.join(STATIC_DIR, 'icon-512.png'), 'image/png')
+        elif path == '/sw.js':
+            self.serve_file(os.path.join(STATIC_DIR, 'sw.js'), 'application/javascript')
 
         elif path == '/api/videos':
             with db_cursor() as (conn, cur):
