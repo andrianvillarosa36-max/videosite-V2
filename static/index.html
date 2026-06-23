@@ -187,9 +187,14 @@
     <button onclick="setCategory('Anime movie')" id="cat-Anime-movie" class="grid-btn">Anime movie</button>
   </div>
 
+  <div id="continueWatchingSection" style="display:none; padding:12px 0 4px;">
+    <div style="padding:0 14px 8px; font-size:0.95rem; font-weight:700; color:#00D4FF;">▶ Continue Watching</div>
+    <div id="continueWatchingRow" style="display:flex; gap:10px; overflow-x:auto; padding:0 14px 8px; scrollbar-width:none;"></div>
+  </div>
+
   <script>
     if (sessionStorage.getItem('jumpToVideo')) {
-      document.write('<style>#gridSection,#filterBar,#ratedSection{display:none !important;}</style>');
+      document.write('<style>#gridSection,#filterBar,#ratedSection,#continueWatchingSection{display:none !important;}</style>');
     }
   </script>
   <div id="gridSection">
@@ -485,6 +490,38 @@
       } else {
         leastPopular.forEach(function(item) { leastRow2.appendChild(buildPopularCard(item)); });
       }
+    }
+
+    function renderContinueWatching() {
+      const section = document.getElementById('continueWatchingSection');
+      const row = document.getElementById('continueWatchingRow');
+
+      const inProgress = allProgress.filter(function(p) {
+        return p.current > 5 && !p.watched;
+      });
+
+      if (!inProgress.length) {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = 'block';
+      row.innerHTML = inProgress.map(function(p) {
+        const v = allVideos.find(function(vv) {
+          return (vv.type === 'series' ? vv.filename : vv.url) === p.videoUrl;
+        });
+        if (!v) return '';
+        const pct = v.episodes ? 0 : Math.min(100, Math.round((p.current / (p.duration || 1)) * 100));
+        const clickAction = v.type === 'series'
+          ? 'openSeries(' + JSON.stringify(v).replace(/"/g, '&quot;') + ')'
+          : 'playVideo(' + JSON.stringify(v.url) + ',' + JSON.stringify(v.title) + ',' + JSON.stringify(v.category) + ',' + JSON.stringify(v.tags || '') + ')';
+        return '<div class="cw-card" onclick="' + clickAction + '">' +
+          '<img src="' + (v.thumb || '') + '" loading="lazy">' +
+          '<div class="cw-progress-track"></div>' +
+          '<div class="cw-progress-bar" style="width:' + pct + '%;"></div>' +
+          '<div class="cw-title">' + escapeHTML(v.title) + '</div>' +
+        '</div>';
+      }).join('');
     }
 
     function renderVideos() {
@@ -1313,6 +1350,8 @@
     }
 
     loadVideos().then(function() {
+      renderContinueWatching();
+
       const splash = document.getElementById('splashScreen');
       if (splash) {
         splash.style.opacity = '0';
