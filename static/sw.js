@@ -1,4 +1,4 @@
-const CACHE_NAME = 'animecorn-v1';
+const CACHE_NAME = 'animecorn-v2';
 const STATIC_ASSETS = [
   '/style.css',
   '/manifest.json',
@@ -25,15 +25,19 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
-  // Only cache GET requests for static assets, never API calls or video streams
-  if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('/api/')) return;
+  // Never intercept page navigations - always hit the live server for HTML
+  if (event.request.mode === 'navigate') return;
+
+  const url = event.request.url;
+  const isStaticAsset = STATIC_ASSETS.some(function(asset) {
+    return url.endsWith(asset);
+  });
+
+  if (!isStaticAsset) return; // let everything else (API, videos, other JS) go straight to network
 
   event.respondWith(
     caches.match(event.request).then(function(cached) {
-      return cached || fetch(event.request).catch(function() {
-        return caches.match('/style.css');
-      });
+      return cached || fetch(event.request);
     })
   );
 });
