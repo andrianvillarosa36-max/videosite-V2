@@ -23,11 +23,11 @@
 
   <!-- BOTTOM NAVIGATION BAR -->
   <nav class="bottom-nav">
-    <div class="bnav-item" id="bnav-home-link" onclick="goHomeFromProfile()">
+    <div class="bnav-item" id="bnav-home" onclick="goHome()">
       <span class="bnav-icon">🏠</span>
       <span class="bnav-label">Home</span>
     </div>
-    <div class="bnav-item" id="bnav-fav-link" onclick="goFavouritesFromProfile()">
+    <div class="bnav-item" id="bnav-fav" onclick="goFavourites()">
       <span class="bnav-icon">❤️</span>
       <span class="bnav-label">Favourites</span>
     </div>
@@ -811,19 +811,6 @@
       document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('active'));
       const el = document.getElementById(id);
       if (el) el.classList.add('active');
-    }
-
-    function goHomeFromProfile() {
-      const params = new URLSearchParams(window.location.search);
-      const from = params.get('from');
-      window.location.href = (from === 'adult') ? '/adult.html' : '/index.html';
-    }
-
-    function goFavouritesFromProfile() {
-      const params = new URLSearchParams(window.location.search);
-      const from = params.get('from');
-      const target = (from === 'adult') ? '/adult.html' : '/index.html';
-      window.location.href = target + '?cat=Favorites';
     }
 
     function toggleMorePanel() {
