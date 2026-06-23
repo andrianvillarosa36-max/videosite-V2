@@ -309,8 +309,10 @@
   <!-- SLIDE-OUT "MORE" PANEL -->
   <div id="moreOverlay" class="more-overlay" onclick="closeMorePanel()"></div>
   <div id="morePanel" class="more-panel">
+    <div id="moreExtraItems"></div>
     <a href="/settings.html" class="more-item">⚙️ Settings</a>
     <div class="more-item logout" onclick="logout()" style="color:#ff6666;">🚪 Logout</div>
+  </div>
   </div>
 
   <script>
@@ -594,6 +596,16 @@
       const target = (from === 'adult') ? '/adult.html' : '/index.html';
       window.location.href = target + '?cat=Favorites';
     }
+
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('from') === 'adult') {
+        document.getElementById('moreExtraItems').innerHTML = `
+          <a href="/adult-top.html" class="more-item">🏆 Top Corn Videos</a>
+          <a href="/index.html" class="more-item">🎬 Main Site</a>
+        `;
+      }
+    })();
 
     function toggleMorePanel() {
       document.getElementById('morePanel').classList.toggle('open');
