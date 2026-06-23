@@ -599,13 +599,20 @@
 
     (function() {
       const params = new URLSearchParams(window.location.search);
+      const extra = document.getElementById('moreExtraItems');
       if (params.get('from') === 'adult') {
-        document.getElementById('moreExtraItems').innerHTML = `
+        extra.innerHTML = `
           <a href="/adult-top.html" class="more-item">🏆 Top Corn Videos</a>
           <a href="/index.html" class="more-item">🎬 Main Site</a>
         `;
+      } else {
+        extra.innerHTML = `
+          <a href="/submit.html" class="more-item">📤 Suggest / Upload</a>
+          <a href="/top.html" class="more-item">🏆 Top Videos</a>
+          <a href="/users.html" class="more-item">👥 Users</a>
+        `;
       }
-    })();
+    })();	
 
     function toggleMorePanel() {
       document.getElementById('morePanel').classList.toggle('open');
