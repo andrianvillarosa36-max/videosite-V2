@@ -1098,7 +1098,9 @@
     }
 
     function goHome() {
-      window.location.href = '/index.html';
+      setCategory('All');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setActiveBnav('bnav-home');
     }
 
     function goFavourites() {
