@@ -16,11 +16,21 @@
   </div>
 
   <div id="splashScreen" style="position:fixed; inset:0; background:#0D1117; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; transition:opacity 0.4s ease;">
-    <div style="font-size:3rem;">🌽</div>
-    <div style="color:#00D4FF; font-size:1.1rem; font-weight:700; margin-top:8px;">AnimeCorn</div>
-    <div style="width:160px; height:6px; background:#1C2333; border-radius:999px; margin-top:20px; overflow:hidden;">
-      <div id="splashProgressBar" style="width:0%; height:100%; background:#00D4FF; border-radius:999px; transition:width 0.25s ease;"></div>
+
+    <div style="position:relative; width:90%; max-width:320px; background:#0D1B2A; border:4px solid #fff; border-radius:14px; padding:24px 16px; display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:50px;">
+      <span style="font-size:1.8rem; position:absolute; top:8px; left:14px;">🐥</span>
+      <span style="font-size:1.8rem; position:absolute; top:10px; right:14px;">🦀</span>
+      <span style="font-size:1.8rem; position:absolute; bottom:6px; left:10px;">🥥</span>
+      <span style="font-size:1.8rem; position:absolute; bottom:6px; right:60px;">🦆</span>
+      <span style="font-size:2.2rem;">🌽</span>
+      <span style="color:#FFD700; font-size:1.8rem; font-weight:900; text-shadow:2px 2px 0 #000;">AnimeCorn</span>
     </div>
+
+    <div style="font-size:1.6rem; margin-bottom:6px;" id="splashWalker">🦄</div>
+    <div style="width:220px; height:18px; background:#0D1B2A; border:3px solid #fff; border-radius:999px; overflow:hidden; position:relative;">
+      <div id="splashProgressBar" style="width:0%; height:100%; background:#0047AB; transition:width 0.25s ease;"></div>
+    </div>
+    <div style="color:#3CFF3C; font-size:0.85rem; font-weight:700; margin-top:10px; letter-spacing:1px;">LOADING...</div>
   </div>
 
   <style>
@@ -444,7 +454,9 @@
 
     function setSplashProgress(pct) {
       const bar = document.getElementById('splashProgressBar');
+      const walker = document.getElementById('splashWalker');
       if (bar) bar.style.width = pct + '%';
+      if (walker) walker.style.transform = 'translateX(' + ((pct - 50) * 1.6) + 'px)';
     }
 
     async function loadVideos() {
