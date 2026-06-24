@@ -1,9 +1,16 @@
-const CACHE_NAME = 'animecorn-v4';
+const CACHE_NAME = 'animecorn-v5';
 const STATIC_ASSETS = [
   '/style.css',
   '/manifest.json',
-  '/icon-512.png'
+  '/icon-512.png',
+  '/index.html',
+  '/adult.html',
+  '/profile.html',
+  '/login.html'
 ];
+
+const API_CACHE_NAME = 'animecorn-api-v1';
+const CACHEABLE_API_PATHS = ['/api/videos'];
 
 self.addEventListener('install', function(event) {
   event.waitUntil(
@@ -25,19 +32,51 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
-  // Never intercept page navigations - always hit the live server for HTML
-  if (event.request.mode === 'navigate') return;
-
   const url = event.request.url;
+
+  // Page navigations: try network first, fall back to cached shell if offline
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(function() {
+        return caches.match(event.request).then(function(cached) {
+          return cached || caches.match('/index.html');
+        });
+      })
+    );
+    return;
+  }
+
+  // Cacheable read-only API calls: network first, cache fallback when offline
+  const isCacheableApi = CACHEABLE_API_PATHS.some(function(p) {
+    return url.includes(p);
+  });
+  if (isCacheableApi && event.request.method === 'GET') {
+    event.respondWith(
+      fetch(event.request).then(function(response) {
+        const clone = response.clone();
+        caches.open(API_CACHE_NAME).then(function(cache) {
+          cache.put(event.request, clone);
+        });
+        return response;
+      }).catch(function() {
+        return caches.match(event.request, { cacheName: API_CACHE_NAME });
+      })
+    );
+    return;
+  }
+
+  // Static assets: cache first
   const isStaticAsset = STATIC_ASSETS.some(function(asset) {
     return url.endsWith(asset);
   });
+  if (isStaticAsset) {
+    event.respondWith(
+      caches.match(event.request).then(function(cached) {
+        return cached || fetch(event.request);
+      })
+    );
+    return;
+  }
 
-  if (!isStaticAsset) return; // let everything else (API, videos, other JS) go straight to network
-
-  event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      return cached || fetch(event.request);
-    })
-  );
+  // Everything else (other API calls, video streams) - straight to network, no interception
 });
