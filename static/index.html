@@ -351,6 +351,8 @@
       speedIndex = 0;
       v.playbackRate = 1;
       document.getElementById('speedBtn').textContent = '1.0x';
+      document.getElementById('playPauseIcon').textContent = '▶️';
+      document.getElementById('centerPlayBtn').style.display = 'flex';
       document.getElementById('customControls').classList.remove('controls-hidden');
 
       v.onplay = function() {
