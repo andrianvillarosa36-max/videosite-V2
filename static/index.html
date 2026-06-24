@@ -18,7 +18,9 @@
   <div id="splashScreen" style="position:fixed; inset:0; background:#0D1117; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; transition:opacity 0.4s ease;">
     <div style="font-size:3rem;">🌽</div>
     <div style="color:#00D4FF; font-size:1.1rem; font-weight:700; margin-top:8px;">AnimeCorn</div>
-    <div style="margin-top:20px; width:36px; height:36px; border:3px solid #30363D; border-top-color:#00D4FF; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+    <div style="width:160px; height:6px; background:#1C2333; border-radius:999px; margin-top:20px; overflow:hidden;">
+      <div id="splashProgressBar" style="width:0%; height:100%; background:#00D4FF; border-radius:999px; transition:width 0.25s ease;"></div>
+    </div>
   </div>
 
   <style>
@@ -440,14 +442,24 @@
       }
     }
 
+    function setSplashProgress(pct) {
+      const bar = document.getElementById('splashProgressBar');
+      if (bar) bar.style.width = pct + '%';
+    }
+
     async function loadVideos() {
       const all     = await safeFetchJson('/api/videos', []);
       allVideos     = all.filter(function(v) { return !adultCategories.includes(v.category); });
+      setSplashProgress(20);
       allRatings    = await safeFetchJson('/api/ratings', []);
+      setSplashProgress(40);
       allProgress   = await safeFetchJson('/api/progress?username=' + user.username, []);
+      setSplashProgress(60);
       const favData = await safeFetchJson('/api/favorites?username=' + user.username, []);
       allFavorites  = favData.map(f => f.videoUrl);
+      setSplashProgress(80);
       allLikes      = await safeFetchJson('/api/likes', []);
+      setSplashProgress(100);
       renderVideos();
     }
 
@@ -1074,9 +1086,7 @@
     }
 
     function goHome() {
-      setCategory('All');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setActiveBnav('bnav-home');
+      window.location.href = '/index.html';
     }
 
     function goFavourites() {
