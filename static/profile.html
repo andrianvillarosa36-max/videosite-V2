@@ -338,10 +338,10 @@
     })();
 
     // 1. Determine Identity Context (Am I viewing myself or someone else?)
-    const loggedInUser = JSON.parse(sessionStorage.getItem('user') || 'null');
+    const loggedInUser = JSON.parse(localStorage.getItem('user') || 'null');
     if (!loggedInUser) window.location.href = '/login.html';
 
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
 
     function authFetch(url, options) {
       options = options || {};
@@ -388,7 +388,7 @@
       if (isOwnProfile) {
         loggedInUser.avatar = profileUser.avatar;
         loggedInUser.bio    = profileUser.bio;
-        sessionStorage.setItem('user', JSON.stringify(loggedInUser));
+        localStorage.setItem('user', JSON.stringify(loggedInUser));
       }
 
       document.getElementById('profileAvatar').textContent = profileUser.avatar || '😀';
@@ -439,7 +439,7 @@
       if (data.success) {
         loggedInUser.avatar = selectedAvatar;
         loggedInUser.bio    = bio;
-        sessionStorage.setItem('user', JSON.stringify(loggedInUser));
+        localStorage.setItem('user', JSON.stringify(loggedInUser));
         renderProfile();
         document.getElementById('saveSuccess').style.display = 'block';
         setTimeout(() => {
@@ -579,8 +579,8 @@
 
     function logout() {
       authFetch('/api/logout', { method: 'POST' }).catch(function() {});
-      sessionStorage.removeItem('user');
-      sessionStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
       window.location.href = '/login.html';
     }
 

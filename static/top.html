@@ -139,7 +139,7 @@
       document.body.style.color      = t.text;
     })();
 
-    const user = JSON.parse(sessionStorage.getItem('user') || 'null');
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
     if (!user) window.location.href = '/login.html';
 
     let allVideos  = [];
@@ -247,7 +247,7 @@
     }
 
     function logout() {
-      sessionStorage.removeItem('user');
+      localStorage.removeItem('user');
       window.location.href = '/login.html';
     }
 

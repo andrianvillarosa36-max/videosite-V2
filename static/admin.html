@@ -74,10 +74,10 @@
   </div>
 
   <script>
-    const user = JSON.parse(sessionStorage.getItem('user') || 'null');
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
     if (!user || user.role !== 'admin') window.location.href = '/login.html';
 
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
 
     function authFetch(url, options) {
       options = options || {};
@@ -210,8 +210,8 @@
 
     function logout() {
       authFetch('/api/logout', { method: 'POST' }).catch(function() {});
-      sessionStorage.removeItem('user');
-      sessionStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
       window.location.href = '/login.html';
     }
 

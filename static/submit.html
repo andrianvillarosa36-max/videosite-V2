@@ -249,8 +249,8 @@
   </div>
 
   <script>
-    const user  = JSON.parse(sessionStorage.getItem('user') || 'null');
-    const token = sessionStorage.getItem('token');
+    const user  = JSON.parse(localStorage.getItem('user') || 'null');
+    const token = localStorage.getItem('token');
     if (!user) window.location.href = '/login.html';
 
     function authFetch(url, options) {
@@ -262,8 +262,8 @@
 
     function logout() {
       authFetch('/api/logout', { method: 'POST' }).catch(function() {});
-      sessionStorage.removeItem('user');
-      sessionStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
       window.location.href = '/login.html';
     }
 

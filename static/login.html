@@ -45,7 +45,7 @@
 
   <script>
     // If already logged in go to home
-    if (sessionStorage.getItem('user')) {
+    if (localStorage.getItem('user')) {
       window.location.href = '/index.html';
     }
 
@@ -79,8 +79,8 @@
       const data = await res.json();
 
       if (data.success) {
-        sessionStorage.setItem('user', JSON.stringify(data));
-        sessionStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data));
+        localStorage.setItem('token', data.token);
         if (data.role === 'admin') {
           window.location.href = '/admin.html';
         } else {
