@@ -506,22 +506,31 @@
       }
 
       section.style.display = 'block';
-      row.innerHTML = inProgress.map(function(p) {
+      row.innerHTML = '';
+
+      inProgress.forEach(function(p) {
         const v = allVideos.find(function(vv) {
           return (vv.type === 'series' ? vv.filename : vv.url) === p.videoUrl;
         });
-        if (!v) return '';
+        if (!v) return;
+
         const pct = v.episodes ? 0 : Math.min(100, Math.round((p.current / (p.duration || 1)) * 100));
-        const clickAction = v.type === 'series'
-          ? 'openSeries(' + JSON.stringify(v).replace(/"/g, '&quot;') + ')'
-          : 'playVideo(' + JSON.stringify(v.url) + ',' + JSON.stringify(v.title) + ',' + JSON.stringify(v.category) + ',' + JSON.stringify(v.tags || '') + ')';
-        return '<div class="cw-card" onclick="' + clickAction + '">' +
+
+        const card = document.createElement('div');
+        card.className = 'cw-card';
+        card.innerHTML =
           '<img src="' + (v.thumb || '') + '" loading="lazy">' +
           '<div class="cw-progress-track"></div>' +
           '<div class="cw-progress-bar" style="width:' + pct + '%;"></div>' +
-          '<div class="cw-title">' + escapeHTML(v.title) + '</div>' +
-        '</div>';
-      }).join('');
+          '<div class="cw-title">' + escapeHTML(v.title) + '</div>';
+
+        card.addEventListener('click', function() {
+          if (v.type === 'series') openSeries(v);
+          else playVideo(v.url, v.title, v.category, v.tags);
+        });
+
+        row.appendChild(card);
+      });
     }
 
     function renderVideos() {
