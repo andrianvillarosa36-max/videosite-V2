@@ -1,4 +1,4 @@
-const CACHE_NAME = 'animecorn-v5';
+const CACHE_NAME = 'animecorn-v6';
 const STATIC_ASSETS = [
   '/style.css',
   '/manifest.json',

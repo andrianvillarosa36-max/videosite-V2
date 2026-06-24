@@ -645,17 +645,23 @@
  
     let allProgress = [];
 
+    async function safeFetchJson(url, fallback) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return fallback;
+        return await res.json();
+      } catch (e) {
+        return fallback;
+      }
+    }
+
     async function loadVideos() {
-      const res     = await fetch('/api/videos');
-      const all     = await res.json();
+      const all     = await safeFetchJson('/api/videos', []);
       allVideos     = all.filter(v => adultCategories.includes(v.category));
-      const rRes    = await fetch('/api/ratings');
-      allRatings    = await rRes.json();
-      const fRes    = await fetch('/api/favorites?username=' + user.username);
-      const favData = await fRes.json();
+      allRatings    = await safeFetchJson('/api/ratings', []);
+      const favData = await safeFetchJson('/api/favorites?username=' + user.username, []);
       allFavorites  = favData.map(f => f.videoUrl);
-      const pRes    = await fetch('/api/progress?username=' + user.username);
-      allProgress   = await pRes.json();
+      allProgress   = await safeFetchJson('/api/progress?username=' + user.username, []);
       renderVideos();
     }
 

@@ -430,19 +430,24 @@
 
     const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
 
+    async function safeFetchJson(url, fallback) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return fallback;
+        return await res.json();
+      } catch (e) {
+        return fallback;
+      }
+    }
+
     async function loadVideos() {
-      const res     = await fetch('/api/videos');
-      const all     = await res.json();
+      const all     = await safeFetchJson('/api/videos', []);
       allVideos     = all.filter(function(v) { return !adultCategories.includes(v.category); });
-      const rRes    = await fetch('/api/ratings');
-      allRatings    = await rRes.json();
-      const pRes    = await fetch('/api/progress?username=' + user.username);
-      allProgress   = await pRes.json();
-      const fRes    = await fetch('/api/favorites?username=' + user.username);
-      const favData = await fRes.json();
+      allRatings    = await safeFetchJson('/api/ratings', []);
+      allProgress   = await safeFetchJson('/api/progress?username=' + user.username, []);
+      const favData = await safeFetchJson('/api/favorites?username=' + user.username, []);
       allFavorites  = favData.map(f => f.videoUrl);
-      const lRes    = await fetch('/api/likes');
-      allLikes      = await lRes.json();
+      allLikes      = await safeFetchJson('/api/likes', []);
       renderVideos();
     }
 
