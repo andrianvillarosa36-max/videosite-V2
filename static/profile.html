@@ -230,6 +230,10 @@
 </head>
 <body>
 
+  <div id="offlineBanner" style="display:none; position:fixed; top:0; left:0; right:0; background:#ff4444; color:#fff; text-align:center; font-size:0.8rem; padding:6px; z-index:10000;">
+    ⚠️ No internet connection — some features won't work
+  </div>
+
   <!-- NAVBAR -->
   <nav>
     <div class="logo">🌽 AnimeCorn</div>
@@ -649,6 +653,16 @@
         </div>
       `);
     }
+
+    function updateOnlineStatus() {
+      const banner = document.getElementById('offlineBanner');
+      if (banner) banner.style.display = navigator.onLine ? 'none' : 'block';
+    }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus();
+
   </script>
 
 </body>
