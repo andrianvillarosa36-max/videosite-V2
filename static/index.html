@@ -273,26 +273,46 @@
     async function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
 
-      // Make sure we're fullscreen first (needed for orientation lock to work on most browsers)
-      if (!document.fullscreenElement) {
-        try {
-          await wrap.requestFullscreen();
-        } catch (e) {
-          // ignore, will still try to lock below
+      try {
+        // 1. Force Fullscreen First
+        // Browsers require the element to be in full-screen before locking orientation.
+        if (!document.fullscreenElement) {
+          if (wrap.requestFullscreen) {
+            await wrap.requestFullscreen();
+          } else if (wrap.webkitRequestFullscreen) { // Safari Fallback
+            await wrap.webkitRequestFullscreen();
+          } else if (wrap.msRequestFullscreen) { // IE/Edge Fallback
+            await wrap.msRequestFullscreen();
+          }
         }
-      }
 
-      if (screen.orientation && screen.orientation.lock) {
-        try {
-          const current = screen.orientation.type || '';
+        // 2. Handle Orientation Lock / Unlock
+        if ('orientation' in screen && 'lock' in screen.orientation) {
+          const current = screen.orientation.type;
+      
           if (current.startsWith('landscape')) {
-            await screen.orientation.unlock();
+            // If it's already landscape, unlock it so the user can rotate freely
+            screen.orientation.unlock();
+        
+            // Optional: If you want it to force-snap back to portrait, uncomment the line below:
+            // await screen.orientation.lock('portrait');
           } else {
+            // Lock to landscape
             await screen.orientation.lock('landscape');
           }
-        } catch (e) {
-          // some browsers block lock outside fullscreen or unsupported, ignore silently
+        } else if (screen.lockOrientation || screen.mozLockOrientation || screen.msLockOrientation) {
+          // 3. Fallbacks for older browsers
+          const lockOrientation = screen.lockOrientation || screen.mozLockOrientation || screen.msLockOrientation;
+          lockOrientation('landscape');
+        } else {
+          console.warn("Screen orientation lock is not supported on this device/browser.");
+          alert("Auto-rotation lock is not supported on this browser.");
         }
+    
+      } catch (err) {
+        // Don't swallow the error! This tells you exactly why it failed.
+        console.error("Orientation toggle failed:", err);
+        alert("Could not change orientation. Make sure you interact with the screen first.");
       }
     }
 
