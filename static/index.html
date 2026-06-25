@@ -270,50 +270,11 @@
       document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
     }
 
-    async function toggleOrientation() {
+    function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
-
-      try {
-        // 1. Force Fullscreen First
-        // Browsers require the element to be in full-screen before locking orientation.
-        if (!document.fullscreenElement) {
-          if (wrap.requestFullscreen) {
-            await wrap.requestFullscreen();
-          } else if (wrap.webkitRequestFullscreen) { // Safari Fallback
-            await wrap.webkitRequestFullscreen();
-          } else if (wrap.msRequestFullscreen) { // IE/Edge Fallback
-            await wrap.msRequestFullscreen();
-          }
-        }
-
-        // 2. Handle Orientation Lock / Unlock
-        if ('orientation' in screen && 'lock' in screen.orientation) {
-          const current = screen.orientation.type;
-      
-          if (current.startsWith('landscape')) {
-            // If it's already landscape, unlock it so the user can rotate freely
-            screen.orientation.unlock();
-        
-            // Optional: If you want it to force-snap back to portrait, uncomment the line below:
-            // await screen.orientation.lock('portrait');
-          } else {
-            // Lock to landscape
-            await screen.orientation.lock('landscape');
-          }
-        } else if (screen.lockOrientation || screen.mozLockOrientation || screen.msLockOrientation) {
-          // 3. Fallbacks for older browsers
-          const lockOrientation = screen.lockOrientation || screen.mozLockOrientation || screen.msLockOrientation;
-          lockOrientation('landscape');
-        } else {
-          console.warn("Screen orientation lock is not supported on this device/browser.");
-          alert("Auto-rotation lock is not supported on this browser.");
-        }
-    
-      } catch (err) {
-        // Don't swallow the error! This tells you exactly why it failed.
-        console.error("Orientation toggle failed:", err);
-        alert("Could not change orientation. Make sure you interact with the screen first.");
-      }
+  
+      // Simply toggle the CSS class that fakes the landscape rotation
+      wrap.classList.toggle('fake-landscape');
     }
 
     function cycleSpeed() {

@@ -576,3 +576,21 @@ body {
 #videoPlayer {
   background: #000 !important;
 }
+
+.fake-landscape {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 100vh !important;
+  height: 100vw !important;
+  transform: translate(-50%, -50%) rotate(90deg) !important;
+  z-index: 99999 !important;
+  background: #000 !important;
+}
+
+.fake-landscape video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
