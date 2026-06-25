@@ -583,9 +583,12 @@ body {
   left: 50% !important;
   width: 100vh !important;
   height: 100vw !important;
+  max-width: 100vh !important;
+  max-height: 100vw !important;
   transform: translate(-50%, -50%) rotate(90deg) !important;
   z-index: 99999 !important;
   background: #000 !important;
+  aspect-ratio: auto !important; /* This stops the 16/9 from fighting the rotation */
 }
 
 .fake-landscape video {
