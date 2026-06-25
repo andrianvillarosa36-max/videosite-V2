@@ -13,6 +13,8 @@ import psycopg2.pool
 
 import urllib.request
 import uuid
+import tempfile
+import requests
 
 SESSION_LIFETIME = timedelta(hours=12)
 
@@ -128,43 +130,146 @@ def safe_join(base_dir, filename):
         return None
     return full_path
 
-def parse_multipart_stream(rfile, content_type, content_length, max_size):
-    boundary = content_type.split('boundary=')[1].encode()
-    if content_length > max_size:
-        raise ValueError('File too large')
-    data = rfile.read(content_length)
-    parts = data.split(b'--' + boundary)
+def parse_multipart_stream(rfile, content_type, content_length, max_total_size, max_file_size=200*1024*1024, read_chunk=65536):
+    """
+    Streams a multipart/form-data body, writing file parts to temp files on disk
+    instead of buffering them in memory. Returns a dict of form fields plus a
+    '_files' list of {'field', 'filename', 'path', 'size'} dicts, and a
+    '_temp_paths' list for cleanup. Caller MUST call cleanup_temp_files() when done.
+    """
+    if content_length > max_total_size:
+        raise ValueError('Upload exceeds the size limit.')
+
+    boundary = content_type.split('boundary=')[1]
+    if boundary.startswith('"') and boundary.endswith('"'):
+        boundary = boundary[1:-1]
+    boundary_bytes = ('--' + boundary).encode()
+
     fields = {}
     files = []
-    for part in parts[1:-1]:
-        header, _, body = part[2:].partition(b'\r\n\r\n')
-        header = header.decode(errors='ignore')
-        body = body.rstrip(b'\r\n')
-        if 'filename="' in header:
-            filename = header.split('filename="')[1].split('"')[0]
-            name = header.split('name="')[1].split('"')[0] if 'name="' in header else 'file'
-            files.append({'field': name, 'filename': filename, 'body': body})
-        elif 'name="' in header:
-            name = header.split('name="')[1].split('"')[0]
-            fields[name] = body.decode(errors='ignore')
+    temp_paths = []
+
+    bytes_remaining = content_length
+    buffer = b''
+
+    def read_more():
+        nonlocal buffer, bytes_remaining
+        if bytes_remaining <= 0:
+            return False
+        chunk = rfile.read(min(read_chunk, bytes_remaining))
+        if not chunk:
+            bytes_remaining = 0
+            return False
+        bytes_remaining -= len(chunk)
+        buffer += chunk
+        return True
+
+    while boundary_bytes not in buffer:
+        if not read_more():
+            raise ValueError('Malformed upload (no initial boundary found).')
+    idx = buffer.index(boundary_bytes) + len(boundary_bytes)
+    buffer = buffer[idx:]
+    while b'\r\n' not in buffer:
+        if not read_more():
+            raise ValueError('Malformed upload.')
+    buffer = buffer[buffer.index(b'\r\n') + 2:]
+
+    try:
+        while True:
+            while b'\r\n\r\n' not in buffer:
+                if not read_more():
+                    raise ValueError('Malformed upload (headers not terminated).')
+            header_bytes, _, buffer = buffer.partition(b'\r\n\r\n')
+            header_text = header_bytes.decode(errors='ignore')
+
+            filename = None
+            field_name = 'file'
+            for line in header_text.split('\r\n'):
+                if 'Content-Disposition' in line:
+                    if 'filename="' in line:
+                        filename = line.split('filename="')[1].split('"')[0]
+                    if 'name="' in line:
+                        field_name = line.split('name="')[1].split('"')[0]
+
+            is_file_part = filename is not None
+
+            if is_file_part:
+                tmp = tempfile.NamedTemporaryFile(delete=False, prefix='upload_', suffix='.bin')
+                temp_paths.append(tmp.name)
+                size_written = 0
+                while True:
+                    boundary_idx = buffer.find(b'\r\n' + boundary_bytes)
+                    if boundary_idx != -1:
+                        tmp.write(buffer[:boundary_idx])
+                        size_written += boundary_idx
+                        consumed_to = boundary_idx + 2 + len(boundary_bytes)
+                        buffer = buffer[consumed_to:]
+                        tmp.close()
+                        break
+                    else:
+                        safe_write_len = max(0, len(buffer) - (len(boundary_bytes) + 4))
+                        if safe_write_len > 0:
+                            tmp.write(buffer[:safe_write_len])
+                            size_written += safe_write_len
+                            buffer = buffer[safe_write_len:]
+                        if size_written > max_file_size:
+                            tmp.close()
+                            raise ValueError(f'"{filename}" exceeds the per-file size limit.')
+                        if not read_more():
+                            tmp.close()
+                            raise ValueError('Malformed upload (file part not terminated).')
+                if size_written > max_file_size:
+                    raise ValueError(f'"{filename}" exceeds the per-file size limit.')
+                files.append({'field': field_name, 'filename': filename, 'path': tmp.name, 'size': size_written})
+            else:
+                while True:
+                    boundary_idx = buffer.find(b'\r\n' + boundary_bytes)
+                    if boundary_idx != -1:
+                        value = buffer[:boundary_idx]
+                        consumed_to = boundary_idx + 2 + len(boundary_bytes)
+                        buffer = buffer[consumed_to:]
+                        fields[field_name] = value.decode(errors='ignore')
+                        break
+                    if not read_more():
+                        raise ValueError('Malformed upload (field not terminated).')
+
+            while len(buffer) < 2:
+                if not read_more():
+                    break
+            if buffer[:2] == b'--':
+                break
+            elif buffer[:2] == b'\r\n':
+                buffer = buffer[2:]
+
+    except ValueError:
+        for p in temp_paths:
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
+        raise
+
     fields['_files'] = files
+    fields['_temp_paths'] = temp_paths
     return fields
 
-def upload_to_catbox(filename, file_bytes):
-    boundary = uuid.uuid4().hex
-    body = b''
-    body += f'--{boundary}\r\nContent-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n'.encode()
-    body += f'--{boundary}\r\nContent-Disposition: form-data; name="fileToUpload"; filename="{filename}"\r\nContent-Type: application/octet-stream\r\n\r\n'.encode()
-    body += file_bytes
-    body += f'\r\n--{boundary}--\r\n'.encode()
+def cleanup_temp_files(fields):
+    for p in fields.get('_temp_paths', []):
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
 
-    req = urllib.request.Request(
-        'https://catbox.moe/user/api.php',
-        data=body,
-        headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}
-    )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        result = resp.read().decode().strip()
+def upload_to_catbox(filename, file_path):
+    """
+    Streams a file from disk to Catbox, never loading the whole file into memory.
+    `file_path` must be a path to a file on disk (e.g. from parse_multipart_stream).
+    """
+    with open(file_path, 'rb') as fh:
+        files = {'fileToUpload': (filename, fh, 'application/octet-stream')}
+        data = {'reqtype': 'fileupload'}
+        resp = requests.post('https://catbox.moe/user/api.php', data=data, files=files, timeout=300)
+    result = resp.text.strip()
     if not result.startswith('https://files.catbox.moe/'):
         raise Exception(f'Catbox upload failed: {result}')
     return result
@@ -811,6 +916,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             content_type = self.headers.get('Content-Type', '')
             THUMB_LIMIT = 10 * 1024 * 1024  # 10MB, plenty for an image
 
+            fields = None
             if 'multipart/form-data' in content_type:
                 try:
                     fields = parse_multipart_stream(self.rfile, content_type, length, THUMB_LIMIT)
@@ -830,26 +936,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 vtype = body.get('type', 'video')
                 thumb_files = []
 
-            if not title:
-                self.send_json({'success': False, 'message': 'Title is required.'})
-                return
-
-            thumb = ''
-            if thumb_files:
-                try:
-                    thumb = upload_to_catbox(thumb_files[0]['filename'], thumb_files[0]['body'])
-                except Exception as e:
-                    print(f'Thumbnail upload error: {e}')
-                    self.send_json({'success': False, 'message': 'Thumbnail upload failed. Try again.'})
+            try:
+                if not title:
+                    self.send_json({'success': False, 'message': 'Title is required.'})
                     return
 
-            with db_cursor() as (conn, cur):
-                cur.execute(
-                    '''INSERT INTO submissions (username, kind, title, description, category, type, thumb, status)
-                       VALUES (%s, 'suggestion', %s, %s, %s, %s, %s, 'pending')''',
-                    (session['username'], title, description, category, vtype, thumb)
-                )
-            self.send_json({'success': True})
+                thumb = ''
+                if thumb_files:
+                    try:
+                        thumb = upload_to_catbox(thumb_files[0]['filename'], thumb_files[0]['path'])
+                    except Exception as e:
+                        print(f'Thumbnail upload error: {e}')
+                        self.send_json({'success': False, 'message': 'Thumbnail upload failed. Try again.'})
+                        return
+
+                with db_cursor() as (conn, cur):
+                    cur.execute(
+                        '''INSERT INTO submissions (username, kind, title, description, category, type, thumb, status)
+                           VALUES (%s, 'suggestion', %s, %s, %s, %s, %s, 'pending')''',
+                        (session['username'], title, description, category, vtype, thumb)
+                    )
+                self.send_json({'success': True})
+            finally:
+                if fields:
+                    cleanup_temp_files(fields)
 
         elif path == '/api/submitupload':
             session = require_auth(self)
@@ -860,75 +970,76 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({'success': False, 'message': 'Invalid upload format.'})
                 return
 
-            MAX_UPLOAD_SIZE = 200 * 1024 * 1024 * 10  # raised cap for multi-episode batches; each file still checked individually below
+            MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # total cap per request (multi-episode batches included)
+            PER_FILE_LIMIT = 300 * 1024 * 1024   # each individual file, checked while streaming
 
             try:
-                fields = parse_multipart_stream(self.rfile, content_type, length, MAX_UPLOAD_SIZE)
+                fields = parse_multipart_stream(self.rfile, content_type, length, MAX_UPLOAD_SIZE, max_file_size=PER_FILE_LIMIT)
             except ValueError:
                 self.send_json({'success': False, 'message': 'Upload exceeds the size limit.'})
                 return
 
-            files = fields.get('_files', [])
-            if not files:
-                self.send_json({'success': False, 'message': 'No file provided.'})
-                return
-
-            title = fields.get('title', '').strip()
-            description = fields.get('description', '').strip()
-            category = fields.get('category', '')
-            vtype = fields.get('type', 'video')
-
-            if not title:
-                self.send_json({'success': False, 'message': 'Title is required.'})
-                return
-
-            thumb = ''
-            thumb_uploads = [f for f in files if f['field'] == 'thumb_file']
-            if thumb_uploads:
-                try:
-                    thumb = upload_to_catbox(thumb_uploads[0]['filename'], thumb_uploads[0]['body'])
-                except Exception as e:
-                    print(f'Thumbnail upload error: {e}')
-                    self.send_json({'success': False, 'message': 'Thumbnail upload failed. Try again.'})
-                    return
-
-            # exclude the thumbnail from the list of episode/video files below
-            files = [f for f in files if f['field'] != 'thumb_file']
-
-            PER_FILE_LIMIT = 200 * 1024 * 1024
-            for f in files:
-                if len(f['body']) > PER_FILE_LIMIT:
-                    self.send_json({'success': False, 'message': f"\"{f['filename']}\" exceeds the 200MB per-file limit."})
-                    return
-
             try:
-                if vtype == 'series':
-                    episodes = []
-                    for i, f in enumerate(files):
-                        ep_title = fields.get(f"ep_title_{f['field']}", f"Episode {i + 1}")
-                        url = upload_to_catbox(f['filename'], f['body'])
-                        episodes.append({'title': ep_title, 'url': url})
-                    with db_cursor() as (conn, cur):
-                        cur.execute(
-                            '''INSERT INTO submissions (username, kind, title, description, category, type, episodes, thumb, status)
-                               VALUES (%s, 'upload', %s, %s, %s, 'series', %s, %s, 'pending')''',
-                            (session['username'], title, description, category, json.dumps(episodes), thumb)
-                        )
-                else:
-                    f = files[0]
-                    catbox_url = upload_to_catbox(f['filename'], f['body'])
-                    with db_cursor() as (conn, cur):
-                        cur.execute(
-                            '''INSERT INTO submissions (username, kind, title, description, category, type, catbox_url, thumb, status)
-                               VALUES (%s, 'upload', %s, %s, %s, %s, %s, %s, 'pending')''',
-                            (session['username'], title, description, category, vtype, catbox_url, thumb)
-                        )
-            except Exception as e:
-                print(f'Catbox upload error: {e}')
-                self.send_json({'success': False, 'message': 'Upload failed. Try smaller files or check your connection.'})
-                return
+                files = fields.get('_files', [])
+                if not files:
+                    self.send_json({'success': False, 'message': 'No file provided.'})
+                    return
 
-            self.send_json({'success': True})
+                title = fields.get('title', '').strip()
+                description = fields.get('description', '').strip()
+                category = fields.get('category', '')
+                vtype = fields.get('type', 'video')
+
+                if not title:
+                    self.send_json({'success': False, 'message': 'Title is required.'})
+                    return
+
+                thumb = ''
+                thumb_uploads = [f for f in files if f['field'] == 'thumb_file']
+                if thumb_uploads:
+                    try:
+                        thumb = upload_to_catbox(thumb_uploads[0]['filename'], thumb_uploads[0]['path'])
+                    except Exception as e:
+                        print(f'Thumbnail upload error: {e}')
+                        self.send_json({'success': False, 'message': 'Thumbnail upload failed. Try again.'})
+                        return
+
+                # exclude the thumbnail from the list of episode/video files below
+                files = [f for f in files if f['field'] != 'thumb_file']
+
+                # Note: per-file size is already enforced inside parse_multipart_stream
+                # (max_file_size param), so no need to re-check len(f['body']) here.
+
+                try:
+                    if vtype == 'series':
+                        episodes = []
+                        for i, f in enumerate(files):
+                            ep_title = fields.get(f"ep_title_{f['field']}", f"Episode {i + 1}")
+                            url = upload_to_catbox(f['filename'], f['path'])
+                            episodes.append({'title': ep_title, 'url': url})
+                        with db_cursor() as (conn, cur):
+                            cur.execute(
+                                '''INSERT INTO submissions (username, kind, title, description, category, type, episodes, thumb, status)
+                                   VALUES (%s, 'upload', %s, %s, %s, 'series', %s, %s, 'pending')''',
+                                (session['username'], title, description, category, json.dumps(episodes), thumb)
+                            )
+                    else:
+                        f = files[0]
+                        catbox_url = upload_to_catbox(f['filename'], f['path'])
+                        with db_cursor() as (conn, cur):
+                            cur.execute(
+                                '''INSERT INTO submissions (username, kind, title, description, category, type, catbox_url, thumb, status)
+                                   VALUES (%s, 'upload', %s, %s, %s, %s, %s, %s, 'pending')''',
+                                (session['username'], title, description, category, vtype, catbox_url, thumb)
+                            )
+                except Exception as e:
+                    print(f'Catbox upload error: {e}')
+                    self.send_json({'success': False, 'message': 'Upload failed. Try smaller files or check your connection.'})
+                    return
+
+                self.send_json({'success': True})
+            finally:
+                cleanup_temp_files(fields)
 
         elif path == '/api/reviewsubmission':
             session = require_admin(self)
