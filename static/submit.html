@@ -360,59 +360,66 @@
           formData.append('type', type);
           if (thumbFile) formData.append('thumb_file', thumbFile, thumbFile.name);
 
-          if (type === 'series') {
-            const fileInputs = document.querySelectorAll('[data-ep-file]');
-            const titleInputs = document.querySelectorAll('[data-ep-title]');
-            let hasFile = false;
-
-            for (let i = 0; i < fileInputs.length; i++) {
-              const f = fileInputs[i].files[0];
-              if (!f) continue;
-              hasFile = true;
-              if (f.size > 200 * 1024 * 1024) {
-                showStatus(`"${f.name}" exceeds the 200MB limit.`, true);
-                btn.disabled = false;
-                return;
-              }
-              const fieldName = 'episode_' + i;
-              formData.append(fieldName, f);
-              formData.append('ep_title_' + fieldName, titleInputs[i].value.trim() || ('Episode ' + (i + 1)));
-            }
-
-            if (!hasFile) {
-              showStatus('Please add at least one episode file.', true);
-              btn.disabled = false;
-              return;
-            }
-          } else {
-            const file = document.getElementById('fFile').files[0];
-            if (!file) {
-              showStatus('Please choose a video file.', true);
-              btn.disabled = false;
-              return;
-            }
-            if (file.size > 200 * 1024 * 1024) {
-              showStatus('File exceeds the 200MB limit.', true);
-              btn.disabled = false;
-              return;
-            }
-            formData.append('file', file);
-          }
-
           document.getElementById('progressBar').style.display = 'block';
 
-          await uploadWithProgress('/api/submitupload', formData, function(pct) {
-            document.getElementById('progressFill').style.width = pct + '%';
-          }).then(async function(data) {
-            if (data.success) {
-              showStatus('File received! Processing in the background, you can leave this page.', false);
+          try {
+            if (type === 'series') {
+              const fileInputs = document.querySelectorAll('[data-ep-file]');
+              const titleInputs = document.querySelectorAll('[data-ep-title]');
+              const episodeFiles = [];
+
+              for (let i = 0; i < fileInputs.length; i++) {
+                const f = fileInputs[i].files[0];
+                if (!f) continue;
+                if (f.size > 300 * 1024 * 1024) {
+                  showStatus(`"${f.name}" exceeds the 300MB limit.`, true);
+                  btn.disabled = false;
+                  document.getElementById('progressBar').style.display = 'none';
+                  return;
+                }
+                episodeFiles.push({ file: f, epTitle: titleInputs[i].value.trim() || ('Episode ' + (i + 1)) });
+              }
+
+              if (!episodeFiles.length) {
+                showStatus('Please add at least one episode file.', true);
+                btn.disabled = false;
+                document.getElementById('progressBar').style.display = 'none';
+                return;
+              }
+
+              const result = await uploadSeriesInChunks(episodeFiles, thumbFile, title, description, category, type, function(pct) {
+                document.getElementById('progressFill').style.width = pct + '%';
+              });
+              showStatus('Files received! Processing in the background, you can leave this page.', false);
               clearForm();
-              await pollUploadStatus(data.submission_id);
+              await pollUploadStatus(result.submission_id);
               loadMySubmissions();
             } else {
-              showStatus(data.message || 'Upload failed.', true);
+              const file = document.getElementById('fFile').files[0];
+              if (!file) {
+                showStatus('Please choose a video file.', true);
+                btn.disabled = false;
+                document.getElementById('progressBar').style.display = 'none';
+                return;
+              }
+              if (file.size > 300 * 1024 * 1024) {
+                showStatus('File exceeds the 300MB limit.', true);
+                btn.disabled = false;
+                document.getElementById('progressBar').style.display = 'none';
+                return;
+              }
+
+              const result = await uploadSingleVideoInChunks(file, thumbFile, title, description, category, type, function(pct) {
+                document.getElementById('progressFill').style.width = pct + '%';
+              });
+              showStatus('File received! Processing in the background, you can leave this page.', false);
+              clearForm();
+              await pollUploadStatus(result.submission_id);
+              loadMySubmissions();
             }
-          });
+          } catch (uploadErr) {
+            showStatus(uploadErr.message || 'Upload failed.', true);
+          }
 
           document.getElementById('progressBar').style.display = 'none';
         }
@@ -443,6 +450,129 @@
           }
         }, 4000);
       });
+    }
+
+    function uploadSingleChunk(uploadId, chunkIndex, blob) {
+      return new Promise(function(resolve, reject) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/uploadchunk?upload_id=' + uploadId + '&chunk_index=' + chunkIndex);
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+        xhr.onload = function() {
+          if (xhr.status === 200) resolve();
+          else reject(new Error('Chunk upload failed (status ' + xhr.status + ')'));
+        };
+        xhr.onerror = function() { reject(new Error('Network error during chunk upload')); };
+        xhr.send(blob);
+      });
+    }
+
+    async function uploadFileWithChunking(file, onProgress) {
+      const CHUNK_SIZE = 5 * 1024 * 1024;
+      const uploadId = 'u' + Date.now() + Math.random().toString(36).slice(2);
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const blob = file.slice(start, start + CHUNK_SIZE);
+
+        let attempts = 0;
+        while (attempts < 3) {
+          try {
+            await uploadSingleChunk(uploadId, i, blob);
+            break;
+          } catch (e) {
+            attempts++;
+            if (attempts >= 3) throw new Error('Failed to upload part of "' + file.name + '" after 3 attempts.');
+            await new Promise(r => setTimeout(r, 1500));
+          }
+        }
+        if (onProgress) onProgress(Math.round(((i + 1) / totalChunks) * 100));
+      }
+
+      return { uploadId, totalChunks };
+    }
+
+    async function finalizeOne(payload) {
+      const res = await fetch('/api/finalizeupload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Finalize failed.');
+      return data;
+    }
+
+    async function uploadThumbIfPresent(thumbFile) {
+      if (!thumbFile) return { thumbUploadId: '', thumbFilename: '' };
+      const result = await uploadFileWithChunking(thumbFile, function() {});
+      await finalizeOne({
+        upload_id: result.uploadId,
+        total_chunks: result.totalChunks,
+        filename: thumbFile.name,
+        is_last_file: false,
+        files_meta: []
+      });
+      return { thumbUploadId: result.uploadId, thumbFilename: thumbFile.name };
+    }
+
+    async function uploadSingleVideoInChunks(videoFile, thumbFile, title, description, category, type, onProgress) {
+      const { thumbUploadId, thumbFilename } = await uploadThumbIfPresent(thumbFile);
+
+      const videoResult = await uploadFileWithChunking(videoFile, onProgress);
+
+      const data = await finalizeOne({
+        upload_id: videoResult.uploadId,
+        total_chunks: videoResult.totalChunks,
+        filename: videoFile.name,
+        field: 'video_file',
+        title: title,
+        description: description,
+        category: category,
+        type: type,
+        thumb_upload_id: thumbUploadId,
+        thumb_filename: thumbFilename,
+        is_last_file: true,
+        files_meta: []
+      });
+      return data;
+    }
+
+    async function uploadSeriesInChunks(episodeFiles, thumbFile, title, description, category, type, onProgress) {
+      const { thumbUploadId, thumbFilename } = await uploadThumbIfPresent(thumbFile);
+
+      let filesMeta = [];
+      for (let i = 0; i < episodeFiles.length; i++) {
+        const ep = episodeFiles[i];
+        const isLast = i === episodeFiles.length - 1;
+
+        const epResult = await uploadFileWithChunking(ep.file, function(pct) {
+          const overall = Math.round(((i + (pct / 100)) / episodeFiles.length) * 100);
+          onProgress(overall);
+        });
+
+        const payload = {
+          upload_id: epResult.uploadId,
+          total_chunks: epResult.totalChunks,
+          filename: ep.file.name,
+          ep_title: ep.epTitle,
+          is_last_file: isLast,
+          files_meta: filesMeta
+        };
+
+        if (isLast) {
+          payload.title = title;
+          payload.description = description;
+          payload.category = category;
+          payload.type = type;
+          payload.thumb_upload_id = thumbUploadId;
+          payload.thumb_filename = thumbFilename;
+        }
+
+        const data = await finalizeOne(payload);
+        if (isLast) return data;
+        filesMeta = data.files_meta;
+      }
     }
 
     function uploadWithProgress(url, formData, onProgress) {

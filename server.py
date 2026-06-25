@@ -1053,6 +1053,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if fields:
                     cleanup_temp_files(fields)
 
+        elif path == '/api/uploadchunk':
+            session = require_auth(self)
+            if not session: return
+
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            upload_id = qs.get('upload_id', [''])[0]
+            chunk_index = qs.get('chunk_index', ['0'])[0]
+
+            if not upload_id or not all(c.isalnum() or c == '-' for c in upload_id):
+                self.send_json({'success': False, 'message': 'Invalid upload_id.'})
+                return
+
+            chunk_dir = os.path.join(PENDING_UPLOADS_DIR, 'chunks_' + upload_id)
+            os.makedirs(chunk_dir, exist_ok=True)
+            chunk_path = os.path.join(chunk_dir, f'chunk_{int(chunk_index):06d}')
+
+            CHUNK_SIZE_LIMIT = 8 * 1024 * 1024  # 8MB per chunk, generous over our 5MB client target
+            if length > CHUNK_SIZE_LIMIT:
+                self.send_json({'success': False, 'message': 'Chunk too large.'})
+                return
+
+            with open(chunk_path, 'wb') as f:
+                remaining = length
+                while remaining > 0:
+                    data = self.rfile.read(min(65536, remaining))
+                    if not data:
+                        break
+                    f.write(data)
+                    remaining -= len(data)
+
+            self.send_json({'success': True})
+
         elif path == '/api/submitupload':
             session = require_auth(self)
             if not session: return
@@ -1112,6 +1145,90 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 submission_id = cur.fetchone()['id']
 
             self.send_json({'success': True, 'submission_id': submission_id, 'status': 'uploading'})
+
+            thread = threading.Thread(
+                target=background_relay_upload,
+                args=(submission_id, vtype, files_meta, thumb_path, thumb_filename),
+                daemon=True
+            )
+            thread.start()
+
+        elif path == '/api/finalizeupload':
+            session = require_auth(self)
+            if not session: return
+
+            body = json.loads(self.rfile.read(length))
+            upload_id = body.get('upload_id', '')
+            total_chunks = body.get('total_chunks', 0)
+            filename = body.get('filename', 'video.mp4')
+            field = body.get('field', 'video_file')
+            title = body.get('title', '').strip()
+            description = body.get('description', '').strip()
+            category = body.get('category', '')
+            vtype = body.get('type', 'video')
+            ep_title = body.get('ep_title', '')
+            thumb_upload_id = body.get('thumb_upload_id', '')
+            thumb_filename = body.get('thumb_filename', '')
+            is_last_file = body.get('is_last_file', True)
+            existing_submission_id = body.get('submission_id')
+            existing_files_meta = body.get('files_meta', [])
+
+            if not upload_id or not all(c.isalnum() or c == '-' for c in upload_id):
+                self.send_json({'success': False, 'message': 'Invalid upload_id.'})
+                return
+
+            chunk_dir = os.path.join(PENDING_UPLOADS_DIR, 'chunks_' + upload_id)
+            final_path = os.path.join(PENDING_UPLOADS_DIR, f'reassembled_{upload_id}.bin')
+
+            try:
+                with open(final_path, 'wb') as out:
+                    for i in range(total_chunks):
+                        chunk_path = os.path.join(chunk_dir, f'chunk_{i:06d}')
+                        with open(chunk_path, 'rb') as cf:
+                            while True:
+                                buf = cf.read(65536)
+                                if not buf:
+                                    break
+                                out.write(buf)
+                for i in range(total_chunks):
+                    try:
+                        os.unlink(os.path.join(chunk_dir, f'chunk_{i:06d}'))
+                    except OSError:
+                        pass
+                try:
+                    os.rmdir(chunk_dir)
+                except OSError:
+                    pass
+            except Exception as e:
+                self.send_json({'success': False, 'message': f'Failed to reassemble file: {e}'})
+                return
+
+            thumb_path = None
+            if thumb_upload_id:
+                thumb_path = os.path.join(PENDING_UPLOADS_DIR, f'reassembled_{thumb_upload_id}.bin')
+
+            new_file_meta = {'filename': filename, 'path': final_path, 'ep_title': ep_title or filename}
+            files_meta = existing_files_meta + [new_file_meta]
+
+            if not is_last_file:
+                # More files coming (multi-episode batch) - just acknowledge, client will call finalize again
+                self.send_json({'success': True, 'files_meta': files_meta})
+                return
+
+            if not title:
+                self.send_json({'success': False, 'message': 'Title is required.'})
+                return
+
+            with db_cursor() as (conn, cur):
+                pending_json = json.dumps([{'path': fm['path'], 'filename': fm['filename']} for fm in files_meta])
+                cur.execute(
+                    '''INSERT INTO submissions (username, kind, title, description, category, type, status, pending_files)
+                       VALUES (%s, 'upload', %s, %s, %s, %s, 'uploading', %s) RETURNING id''',
+                    (session['username'], title, description, category, vtype, pending_json)
+                )
+                submission_id = cur.fetchone()['id']
+
+            self.send_json({'success': True, 'submission_id': submission_id, 'status': 'uploading', 'done': True})
 
             thread = threading.Thread(
                 target=background_relay_upload,
