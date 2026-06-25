@@ -450,8 +450,6 @@
     }
 
     async function safeFetchJson(url, fallback) {
-
-    async function safeFetchJson(url, fallback) {
       try {
         const res = await fetch(url);
         if (!res.ok) return fallback;
