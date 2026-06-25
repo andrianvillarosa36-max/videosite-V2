@@ -280,6 +280,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.serve_file(os.path.join(STATIC_DIR, 'signup.html'), 'text/html')
         elif path == '/submit.html':
             self.serve_file(os.path.join(STATIC_DIR, 'submit.html'), 'text/html')
+        elif path == '/cors_test.html':
+            self.serve_file(os.path.join(STATIC_DIR, 'cors_test.html'), 'text/html')
         elif path == '/manifest.json':
             self.serve_file(os.path.join(STATIC_DIR, 'manifest.json'), 'application/json')
         elif path == '/icon-512.png':
