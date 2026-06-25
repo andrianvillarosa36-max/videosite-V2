@@ -273,8 +273,16 @@
     function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
   
-      // Simply toggle the CSS class that fakes the landscape rotation
+      // Toggle the rotation class regardless of what other classes are there
       wrap.classList.toggle('fake-landscape');
+   
+      // If you notice the video is hidden behind something, 
+      // ensure the wrap stays on top
+      if (wrap.classList.contains('fake-landscape')) {
+          wrap.style.zIndex = "999999"; 
+      } else {
+          wrap.style.zIndex = "initial";
+      }
     }
 
     function cycleSpeed() {
