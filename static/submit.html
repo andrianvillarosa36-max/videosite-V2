@@ -403,10 +403,11 @@
 
           await uploadWithProgress('/api/submitupload', formData, function(pct) {
             document.getElementById('progressFill').style.width = pct + '%';
-          }).then(function(data) {
+          }).then(async function(data) {
             if (data.success) {
-              showStatus('Upload submitted! An admin will review it.', false);
+              showStatus('File received! Processing in the background, you can leave this page.', false);
               clearForm();
+              await pollUploadStatus(data.submission_id);
               loadMySubmissions();
             } else {
               showStatus(data.message || 'Upload failed.', true);
@@ -421,6 +422,30 @@
 
       btn.disabled = false;
     }
+
+    function pollUploadStatus(submissionId) {
+      return new Promise(function(resolve) {
+        const interval = setInterval(async function() {
+          try {
+            const res = await authFetch('/api/uploadstatus?id=' + submissionId);
+            const data = await res.json();
+            if (data.success && data.status !== 'uploading') {
+              clearInterval(interval);
+              if (data.status === 'failed') {
+                showStatus('Background upload failed: ' + (data.admin_note || 'unknown error'), true);
+              } else {
+                showStatus('Upload finished processing! Pending admin review.', false);
+              }
+              resolve();
+            }
+          } catch (e) {
+            // keep polling, ignore transient errors
+          }
+        }, 4000);
+      });
+    }
+
+    function uploadWithProgress(url, formData, onProgress) {
 
     function uploadWithProgress(url, formData, onProgress) {
       return new Promise(function(resolve, reject) {

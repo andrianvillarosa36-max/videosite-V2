@@ -4,3 +4,5 @@ __pycache__/
 node_modules/
 
 data/access_log.txt
+
+pending_uploads/

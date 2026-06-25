@@ -15,6 +15,10 @@ import urllib.request
 import uuid
 import tempfile
 import requests
+import threading
+
+PENDING_UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pending_uploads')
+os.makedirs(PENDING_UPLOADS_DIR, exist_ok=True)
 
 SESSION_LIFETIME = timedelta(hours=12)
 
@@ -194,7 +198,7 @@ def parse_multipart_stream(rfile, content_type, content_length, max_total_size, 
             is_file_part = filename is not None
 
             if is_file_part:
-                tmp = tempfile.NamedTemporaryFile(delete=False, prefix='upload_', suffix='.bin')
+                tmp = tempfile.NamedTemporaryFile(delete=False, prefix='upload_', suffix='.bin', dir=PENDING_UPLOADS_DIR)
                 temp_paths.append(tmp.name)
                 size_written = 0
                 while True:
@@ -273,6 +277,80 @@ def upload_to_catbox(filename, file_path):
     if not result.startswith('https://files.catbox.moe/'):
         raise Exception(f'Catbox upload failed: {result}')
     return result
+
+def background_relay_upload(submission_id, vtype, files_meta, thumb_path, thumb_filename):
+    """
+    Runs in a background thread. Relays already-saved local files to Catbox,
+    then updates the submission row with the final catbox_url/episodes/thumb
+    and flips status to 'pending'. Cleans up local temp files when done.
+    """
+    db_url = os.environ.get('DATABASE_URL')
+    try:
+        thumb_url = ''
+        if thumb_path:
+            try:
+                thumb_url = upload_to_catbox(thumb_filename, thumb_path)
+            except Exception as e:
+                print(f'[background upload {submission_id}] thumbnail relay failed: {e}')
+
+        if vtype == 'series':
+            episodes = []
+            for item in files_meta:
+                try:
+                    url = upload_to_catbox(item['filename'], item['path'])
+                    episodes.append({'title': item['ep_title'], 'url': url})
+                except Exception as e:
+                    print(f'[background upload {submission_id}] episode relay failed: {e}')
+                    conn = psycopg2.connect(db_url)
+                    cur = conn.cursor()
+                    cur.execute("UPDATE submissions SET status = 'failed', admin_note = %s WHERE id = %s",
+                                (f'Upload failed: {e}', submission_id))
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+                    return
+            conn = psycopg2.connect(db_url)
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE submissions SET episodes = %s, thumb = %s, status = 'pending', pending_files = NULL WHERE id = %s",
+                (json.dumps(episodes), thumb_url, submission_id)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+        else:
+            item = files_meta[0]
+            try:
+                catbox_url = upload_to_catbox(item['filename'], item['path'])
+            except Exception as e:
+                print(f'[background upload {submission_id}] video relay failed: {e}')
+                conn = psycopg2.connect(db_url)
+                cur = conn.cursor()
+                cur.execute("UPDATE submissions SET status = 'failed', admin_note = %s WHERE id = %s",
+                            (f'Upload failed: {e}', submission_id))
+                conn.commit()
+                cur.close()
+                conn.close()
+                return
+            conn = psycopg2.connect(db_url)
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE submissions SET catbox_url = %s, thumb = %s, status = 'pending', pending_files = NULL WHERE id = %s",
+                (catbox_url, thumb_url, submission_id)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+    finally:
+        # Clean up local files regardless of success/failure
+        all_paths = [f['path'] for f in files_meta]
+        if thumb_path:
+            all_paths.append(thumb_path)
+        for p in all_paths:
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
 
 def hash_password(password, salt=None):
     if salt is None:
@@ -471,6 +549,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 cur.execute('SELECT * FROM comments WHERE video_url = %s ORDER BY id', (videoUrl,))
                 rows = cur.fetchall()
             self.send_json([comment_row_to_json(c) for c in rows])
+
+        elif path.startswith('/api/uploadstatus'):
+            session = require_auth(self)
+            if not session: return
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            sub_id = qs.get('id', [''])[0]
+            with db_cursor() as (conn, cur):
+                cur.execute('SELECT id, status, admin_note FROM submissions WHERE id = %s', (sub_id,))
+                row = cur.fetchone()
+            if not row:
+                self.send_json({'success': False, 'message': 'Not found'})
+                return
+            self.send_json({'success': True, 'status': row['status'], 'admin_note': row['admin_note']})
 
         elif path == '/api/mysubmissions':
             session = require_auth(self)
@@ -970,8 +1062,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({'success': False, 'message': 'Invalid upload format.'})
                 return
 
-            MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # total cap per request (multi-episode batches included)
-            PER_FILE_LIMIT = 300 * 1024 * 1024   # each individual file, checked while streaming
+            MAX_UPLOAD_SIZE = 500 * 1024 * 1024
+            PER_FILE_LIMIT = 300 * 1024 * 1024
 
             try:
                 fields = parse_multipart_stream(self.rfile, content_type, length, MAX_UPLOAD_SIZE, max_file_size=PER_FILE_LIMIT)
@@ -979,67 +1071,54 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({'success': False, 'message': 'Upload exceeds the size limit.'})
                 return
 
-            try:
-                files = fields.get('_files', [])
-                if not files:
-                    self.send_json({'success': False, 'message': 'No file provided.'})
-                    return
-
-                title = fields.get('title', '').strip()
-                description = fields.get('description', '').strip()
-                category = fields.get('category', '')
-                vtype = fields.get('type', 'video')
-
-                if not title:
-                    self.send_json({'success': False, 'message': 'Title is required.'})
-                    return
-
-                thumb = ''
-                thumb_uploads = [f for f in files if f['field'] == 'thumb_file']
-                if thumb_uploads:
-                    try:
-                        thumb = upload_to_catbox(thumb_uploads[0]['filename'], thumb_uploads[0]['path'])
-                    except Exception as e:
-                        print(f'Thumbnail upload error: {e}')
-                        self.send_json({'success': False, 'message': 'Thumbnail upload failed. Try again.'})
-                        return
-
-                # exclude the thumbnail from the list of episode/video files below
-                files = [f for f in files if f['field'] != 'thumb_file']
-
-                # Note: per-file size is already enforced inside parse_multipart_stream
-                # (max_file_size param), so no need to re-check len(f['body']) here.
-
-                try:
-                    if vtype == 'series':
-                        episodes = []
-                        for i, f in enumerate(files):
-                            ep_title = fields.get(f"ep_title_{f['field']}", f"Episode {i + 1}")
-                            url = upload_to_catbox(f['filename'], f['path'])
-                            episodes.append({'title': ep_title, 'url': url})
-                        with db_cursor() as (conn, cur):
-                            cur.execute(
-                                '''INSERT INTO submissions (username, kind, title, description, category, type, episodes, thumb, status)
-                                   VALUES (%s, 'upload', %s, %s, %s, 'series', %s, %s, 'pending')''',
-                                (session['username'], title, description, category, json.dumps(episodes), thumb)
-                            )
-                    else:
-                        f = files[0]
-                        catbox_url = upload_to_catbox(f['filename'], f['path'])
-                        with db_cursor() as (conn, cur):
-                            cur.execute(
-                                '''INSERT INTO submissions (username, kind, title, description, category, type, catbox_url, thumb, status)
-                                   VALUES (%s, 'upload', %s, %s, %s, %s, %s, %s, 'pending')''',
-                                (session['username'], title, description, category, vtype, catbox_url, thumb)
-                            )
-                except Exception as e:
-                    print(f'Catbox upload error: {e}')
-                    self.send_json({'success': False, 'message': 'Upload failed. Try smaller files or check your connection.'})
-                    return
-
-                self.send_json({'success': True})
-            finally:
+            files = fields.get('_files', [])
+            if not files:
+                self.send_json({'success': False, 'message': 'No file provided.'})
                 cleanup_temp_files(fields)
+                return
+
+            title = fields.get('title', '').strip()
+            description = fields.get('description', '').strip()
+            category = fields.get('category', '')
+            vtype = fields.get('type', 'video')
+
+            if not title:
+                self.send_json({'success': False, 'message': 'Title is required.'})
+                cleanup_temp_files(fields)
+                return
+
+            thumb_uploads = [f for f in files if f['field'] == 'thumb_file']
+            thumb_path = thumb_uploads[0]['path'] if thumb_uploads else None
+            thumb_filename = thumb_uploads[0]['filename'] if thumb_uploads else None
+
+            video_files = [f for f in files if f['field'] != 'thumb_file']
+            if not video_files:
+                self.send_json({'success': False, 'message': 'No video file provided.'})
+                cleanup_temp_files(fields)
+                return
+
+            files_meta = []
+            for i, f in enumerate(video_files):
+                ep_title = fields.get(f"ep_title_{f['field']}", f"Episode {i + 1}")
+                files_meta.append({'filename': f['filename'], 'path': f['path'], 'ep_title': ep_title})
+
+            with db_cursor() as (conn, cur):
+                pending_json = json.dumps([{'path': fm['path'], 'filename': fm['filename']} for fm in files_meta])
+                cur.execute(
+                    '''INSERT INTO submissions (username, kind, title, description, category, type, status, pending_files)
+                       VALUES (%s, 'upload', %s, %s, %s, %s, 'uploading', %s) RETURNING id''',
+                    (session['username'], title, description, category, vtype, pending_json)
+                )
+                submission_id = cur.fetchone()['id']
+
+            self.send_json({'success': True, 'submission_id': submission_id, 'status': 'uploading'})
+
+            thread = threading.Thread(
+                target=background_relay_upload,
+                args=(submission_id, vtype, files_meta, thumb_path, thumb_filename),
+                daemon=True
+            )
+            thread.start()
 
         elif path == '/api/reviewsubmission':
             session = require_admin(self)
