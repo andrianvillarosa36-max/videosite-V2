@@ -442,6 +442,15 @@
 
     const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
 
+    function escapeHTML(str) {
+      if (!str) return '';
+      return str.replace(/[&<>'"]/g,
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+      );
+    }
+
+    async function safeFetchJson(url, fallback) {
+
     async function safeFetchJson(url, fallback) {
       try {
         const res = await fetch(url);
