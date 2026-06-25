@@ -1184,6 +1184,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 with open(final_path, 'wb') as out:
                     for i in range(total_chunks):
                         chunk_path = os.path.join(chunk_dir, f'chunk_{i:06d}')
+                        if not os.path.exists(chunk_path):
+                            raise Exception(f'Chunk {i} of {total_chunks} is missing (upload_id={upload_id}). The upload may have been interrupted.')
                         with open(chunk_path, 'rb') as cf:
                             while True:
                                 buf = cf.read(65536)
@@ -1200,7 +1202,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 except OSError:
                     pass
             except Exception as e:
-                self.send_json({'success': False, 'message': f'Failed to reassemble file: {e}'})
+                self.send_json({'success': False, 'message': str(e)})
                 return
 
             thumb_path = None
