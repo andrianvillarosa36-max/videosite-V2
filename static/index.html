@@ -272,14 +272,17 @@
 
     function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
+      const controls = document.getElementById('customControls');
       const isRotated = wrap.classList.contains('fake-landscape');
 
       if (isRotated) {
         wrap.classList.remove('fake-landscape');
         wrap.style.zIndex = 'initial';
+        controls.style.transform = '';
       } else {
         wrap.classList.add('fake-landscape');
         wrap.style.zIndex = '999999';
+        controls.style.transform = 'rotate(-90deg)';
       }
     }
 
@@ -292,11 +295,13 @@
     }
 
     function toggleFullscreen() {
-      const wrap = document.getElementById('playerWrap');
-      if (!document.fullscreenElement) {
-        wrap.requestFullscreen().catch(function() {});
-      } else {
+      const video = document.getElementById('videoPlayer');
+      if (document.fullscreenElement) {
         document.exitFullscreen().catch(function() {});
+      } else if (video.requestFullscreen) {
+        video.requestFullscreen().catch(function() {});
+      } else if (video.webkitEnterFullscreen) {
+        video.webkitEnterFullscreen();
       }
     }
     
