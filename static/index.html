@@ -277,15 +277,9 @@
       if (isRotated) {
         wrap.classList.remove('fake-landscape');
         wrap.style.zIndex = 'initial';
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(function() {});
-        }
       } else {
         wrap.classList.add('fake-landscape');
         wrap.style.zIndex = '999999';
-        if (!document.fullscreenElement) {
-          wrap.requestFullscreen().catch(function() {});
-        }
       }
     }
 
