@@ -274,10 +274,6 @@
       const wrap = document.getElementById('playerWrap');
       const isRotated = wrap.classList.contains('fake-landscape');
 
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(function() {});
-      }
-
       if (isRotated) {
         wrap.classList.remove('fake-landscape');
         wrap.style.zIndex = 'initial';
@@ -285,7 +281,7 @@
         wrap.classList.add('fake-landscape');
         wrap.style.zIndex = '999999';
       }
-    }    
+    }
 
     function cycleSpeed() {
       speedIndex = (speedIndex + 1) % speedOptions.length;
@@ -297,15 +293,13 @@
 
     function toggleFullscreen() {
       const wrap = document.getElementById('playerWrap');
-      wrap.classList.remove('fake-landscape');
-      wrap.style.zIndex = 'initial';
       if (!document.fullscreenElement) {
         wrap.requestFullscreen().catch(function() {});
       } else {
         document.exitFullscreen().catch(function() {});
       }
     }
-
+    
     function toggleLock() {
       isLocked = !isLocked;
       const lockBtn = document.getElementById('lockBtn');
