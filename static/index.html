@@ -280,33 +280,33 @@
       return window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
     }
 
-    async function toggleOrientation() {
+    function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
       const isRotated = wrap.classList.contains('fake-landscape');
 
-      if (isCapacitorApp()) {
-        try {
-          const { ScreenOrientation } = Capacitor.Plugins;
-          if (isRotated) {
-            await ScreenOrientation.unlock();
-            wrap.classList.remove('fake-landscape');
-            wrap.style.zIndex = 'initial';
-          } else {
-            await ScreenOrientation.lock({ orientation: 'landscape' });
-            wrap.classList.remove('fake-landscape');
-            wrap.style.zIndex = 'initial';
-          }
-        } catch(e) {
-          console.log('ScreenOrientation error:', e);
+      if (window.NativeBridge) {
+        // Native app — use Android bridge for real orientation lock
+        if (isRotated) {
+          window.NativeBridge.unlockOrientation();
+          wrap.classList.remove('fake-landscape');
+          wrap.style.zIndex = 'initial';
+          document.getElementById('orientBtn').textContent = '🔄';
+        } else {
+          window.NativeBridge.lockLandscape();
+          wrap.classList.remove('fake-landscape');
+          wrap.style.zIndex = 'initial';
+          document.getElementById('orientBtn').textContent = '🔁';
         }
       } else {
         // Browser fallback — CSS rotation
         if (isRotated) {
           wrap.classList.remove('fake-landscape');
           wrap.style.zIndex = 'initial';
+          document.getElementById('orientBtn').textContent = '🔄';
         } else {
           wrap.classList.add('fake-landscape');
           wrap.style.zIndex = '999999';
+          document.getElementById('orientBtn').textContent = '🔁';
         }
       }
     }
@@ -1069,6 +1069,16 @@
     }
 
     function goBack() {
+      // Always unlock orientation when leaving the player
+      if (window.NativeBridge) {
+        window.NativeBridge.unlockOrientation();
+      }
+      const wrap = document.getElementById('playerWrap');
+      wrap.classList.remove('fake-landscape');
+      wrap.style.zIndex = 'initial';
+      const orientBtn = document.getElementById('orientBtn');
+      if (orientBtn) orientBtn.textContent = '🔄';
+
       document.getElementById('likeBar').innerHTML = '';
       if (window._progressTimer) clearInterval(window._progressTimer);
       const videoEl = document.getElementById('videoPlayer');
