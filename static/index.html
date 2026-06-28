@@ -8,6 +8,12 @@
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0D1117" />
   <link rel="icon" href="/icon-512.png" />
+  <script>
+    // Load Capacitor bridge only when running inside the native app
+    if (window.location.protocol !== 'http:' || window.Capacitor) {
+      document.write('<script src="capacitor://localhost/capacitor.js"><\/script>');
+    }
+  </script>
 </head>
 <body>
 
@@ -270,19 +276,38 @@
       document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
     }
 
-    function toggleOrientation() {
+    function isCapacitorApp() {
+      return window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+    }
+
+    async function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
-      const controls = document.getElementById('customControls');
       const isRotated = wrap.classList.contains('fake-landscape');
 
-      if (isRotated) {
-        wrap.classList.remove('fake-landscape');
-        wrap.style.zIndex = 'initial';
-        controls.style.transform = '';
+      if (isCapacitorApp()) {
+        try {
+          const { ScreenOrientation } = Capacitor.Plugins;
+          if (isRotated) {
+            await ScreenOrientation.unlock();
+            wrap.classList.remove('fake-landscape');
+            wrap.style.zIndex = 'initial';
+          } else {
+            await ScreenOrientation.lock({ orientation: 'landscape' });
+            wrap.classList.remove('fake-landscape');
+            wrap.style.zIndex = 'initial';
+          }
+        } catch(e) {
+          console.log('ScreenOrientation error:', e);
+        }
       } else {
-        wrap.classList.add('fake-landscape');
-        wrap.style.zIndex = '999999';
-        controls.style.transform = 'rotate(-90deg)';
+        // Browser fallback — CSS rotation
+        if (isRotated) {
+          wrap.classList.remove('fake-landscape');
+          wrap.style.zIndex = 'initial';
+        } else {
+          wrap.classList.add('fake-landscape');
+          wrap.style.zIndex = '999999';
+        }
       }
     }
 
@@ -294,17 +319,34 @@
       showControls();
     }
 
-    function toggleFullscreen() {
+    async function toggleFullscreen() {
       const video = document.getElementById('videoPlayer');
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(function() {});
-      } else if (video.requestFullscreen) {
-        video.requestFullscreen().catch(function() {});
-      } else if (video.webkitEnterFullscreen) {
-        video.webkitEnterFullscreen();
+      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+
+      if (isCapacitorApp()) {
+        try {
+          const { StatusBar, ScreenOrientation } = Capacitor.Plugins;
+          if (isFs) {
+            await ScreenOrientation.unlock();
+            await StatusBar.show();
+          } else {
+            await ScreenOrientation.lock({ orientation: 'landscape' });
+            await StatusBar.hide();
+          }
+        } catch(e) {
+          console.log('Fullscreen error:', e);
+        }
+      } else {
+        if (isFs) {
+          (document.exitFullscreen || document.webkitExitFullscreen).call(document).catch(function(){});
+        } else if (video.requestFullscreen) {
+          video.requestFullscreen().catch(function(){});
+        } else if (video.webkitEnterFullscreen) {
+          video.webkitEnterFullscreen();
+        }
       }
     }
-    
+
     function toggleLock() {
       isLocked = !isLocked;
       const lockBtn = document.getElementById('lockBtn');
@@ -1393,6 +1435,17 @@
       const videoUrl = listElId === 'commentList' ? window._currentVideoUrl : window._currentSeriesId;
       loadComments(videoUrl, listElId);
     }
+
+    // Initialize Capacitor plugins on startup
+    document.addEventListener('deviceready', async function() {
+      if (isCapacitorApp()) {
+        try {
+          const { StatusBar } = Capacitor.Plugins;
+          await StatusBar.setBackgroundColor({ color: '#0D1117' });
+          await StatusBar.setStyle({ style: 'DARK' });
+        } catch(e) {}
+      }
+    });
 
     loadVideos().then(function() {
       renderContinueWatching();
