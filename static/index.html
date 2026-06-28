@@ -272,16 +272,20 @@
 
     function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
-  
-      // Toggle the rotation class regardless of what other classes are there
-      wrap.classList.toggle('fake-landscape');
-   
-      // If you notice the video is hidden behind something, 
-      // ensure the wrap stays on top
-      if (wrap.classList.contains('fake-landscape')) {
-          wrap.style.zIndex = "999999"; 
+      const isRotated = wrap.classList.contains('fake-landscape');
+
+      if (isRotated) {
+        wrap.classList.remove('fake-landscape');
+        wrap.style.zIndex = 'initial';
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(function() {});
+        }
       } else {
-          wrap.style.zIndex = "initial";
+        wrap.classList.add('fake-landscape');
+        wrap.style.zIndex = '999999';
+        if (!document.fullscreenElement) {
+          wrap.requestFullscreen().catch(function() {});
+        }
       }
     }
 
@@ -298,7 +302,9 @@
       if (!document.fullscreenElement) {
         wrap.requestFullscreen().catch(function() {});
       } else {
-        document.exitFullscreen();
+        document.exitFullscreen().catch(function() {});
+        wrap.classList.remove('fake-landscape');
+        wrap.style.zIndex = 'initial';
       }
     }
 
