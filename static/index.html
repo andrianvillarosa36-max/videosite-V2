@@ -44,7 +44,7 @@
   </style>
 
   <!-- BOTTOM NAVIGATION BAR -->
-  <nav class="bottom-nav">
+  <nav class="bottom-nav" id="bottomNav">
     <div class="bnav-item active" id="bnav-home" onclick="goHome()">
       <span class="bnav-icon">🏠</span>
       <span class="bnav-label">Home</span>
@@ -309,33 +309,36 @@
     function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
       const isRotated = wrap.classList.contains('fake-landscape');
+      const bottomNav = document.getElementById('bottomNav');
 
       if (window.NativeBridge) {
-        // Native app — use Android bridge for real orientation lock
         if (isRotated) {
           window.NativeBridge.unlockOrientation();
           wrap.classList.remove('fake-landscape');
           wrap.style.zIndex = 'initial';
+          if (bottomNav) bottomNav.style.display = '';
           document.getElementById('orientBtn').textContent = '🔄';
         } else {
           window.NativeBridge.lockLandscape();
           wrap.classList.remove('fake-landscape');
           wrap.style.zIndex = 'initial';
+          if (bottomNav) bottomNav.style.display = 'none';
           document.getElementById('orientBtn').textContent = '🔁';
         }
       } else {
-        // Browser fallback — CSS rotation
         if (isRotated) {
           wrap.classList.remove('fake-landscape');
           wrap.style.zIndex = 'initial';
+          if (bottomNav) bottomNav.style.display = '';
           document.getElementById('orientBtn').textContent = '🔄';
         } else {
           wrap.classList.add('fake-landscape');
           wrap.style.zIndex = '999999';
+          if (bottomNav) bottomNav.style.display = 'none';
           document.getElementById('orientBtn').textContent = '🔁';
         }
       }
-    }
+    }    
 
     function cycleSpeed() {
       speedIndex = (speedIndex + 1) % speedOptions.length;
@@ -1120,6 +1123,8 @@
       wrap.style.zIndex = 'initial';
       const orientBtn = document.getElementById('orientBtn');
       if (orientBtn) orientBtn.textContent = '🔄';
+      const bottomNav = document.getElementById('bottomNav');
+      if (bottomNav) bottomNav.style.display = '';
 
       document.getElementById('likeBar').innerHTML = '';
       if (window._progressTimer) clearInterval(window._progressTimer);
