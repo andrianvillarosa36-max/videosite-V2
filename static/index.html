@@ -306,18 +306,6 @@
       return window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
     }
 
-    window.addEventListener('load', function() {
-      console.log('NativeBridge available:', !!window.NativeBridge);
-      console.log('Capacitor available:', !!window.Capacitor);
-      // Temporary visual debug — remove after testing
-      const dbg = document.createElement('div');
-      dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.8);color:#0f0;font-size:0.65rem;padding:4px 8px;z-index:99999;';
-      dbg.id = 'debugBanner';
-      dbg.textContent = 'NativeBridge: ' + (!!window.NativeBridge) + ' | Capacitor: ' + (!!window.Capacitor);
-      document.body.appendChild(dbg);
-      setTimeout(function() { const el = document.getElementById('debugBanner'); if(el) el.remove(); }, 8000);
-    });
-
     function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
       const isRotated = wrap.classList.contains('fake-landscape');
@@ -326,14 +314,19 @@
       if (window.NativeBridge) {
         if (isRotated) {
           window.NativeBridge.unlockOrientation();
-          wrap.classList.remove('fake-landscape');
+          wrap.classList.remove('native-landscape');
           wrap.style.zIndex = 'initial';
+          wrap.style.position = '';
+          wrap.style.width = '';
+          wrap.style.height = '';
+          wrap.style.top = '';
+          wrap.style.left = '';
           if (bottomNav) bottomNav.style.display = '';
           document.getElementById('orientBtn').textContent = '🔄';
         } else {
           window.NativeBridge.lockLandscape();
-          wrap.classList.remove('fake-landscape');
-          wrap.style.zIndex = 'initial';
+          wrap.classList.add('native-landscape');
+          wrap.style.zIndex = '99999';
           if (bottomNav) bottomNav.style.display = 'none';
           document.getElementById('orientBtn').textContent = '🔁';
         }
@@ -1130,14 +1123,21 @@
       if (window.NativeBridge) {
         window.NativeBridge.unlockOrientation();
       }
+
       const wrap = document.getElementById('playerWrap');
       wrap.classList.remove('fake-landscape');
+      wrap.classList.remove('native-landscape');
       wrap.style.zIndex = 'initial';
+      wrap.style.position = '';
+      wrap.style.width = '';
+      wrap.style.height = '';
+      wrap.style.top = '';
+      wrap.style.left = '';
       const orientBtn = document.getElementById('orientBtn');
       if (orientBtn) orientBtn.textContent = '🔄';
       const bottomNav = document.getElementById('bottomNav');
       if (bottomNav) bottomNav.style.display = '';
-
+ 
       document.getElementById('likeBar').innerHTML = '';
       if (window._progressTimer) clearInterval(window._progressTimer);
       const videoEl = document.getElementById('videoPlayer');

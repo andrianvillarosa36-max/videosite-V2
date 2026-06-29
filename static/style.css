@@ -329,13 +329,22 @@ button {
 .online-dot.offline { background: var(--muted); }
 
 /* ===== NEW VIDEO PLAYER ===== */
-
 #playerWrap {
   width: 100%;
   aspect-ratio: 16/9;
-  overflow: hidden;
   position: relative;
   background: #000;
+}
+
+/* Native landscape mode - fills full screen when device rotates */
+#playerWrap.native-landscape {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  aspect-ratio: unset !important;
+  z-index: 99999 !important;
 }
 
 #playerWrap video {
@@ -344,6 +353,7 @@ button {
   display: block;
   background: #000;
   object-fit: contain;
+  overflow: hidden;
 }
 
 /* Lock button */
