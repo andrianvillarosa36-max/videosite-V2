@@ -101,66 +101,13 @@
 
   <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
-    <div id="playerWrap" style="position:relative; background:#000;" onclick="onPlayerTap(event)">
-      <video id="videoPlayer" playsinline poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAwMDAiLz48L3N2Zz4="></video>
-
-      <!-- LOCK BUTTON -->
-      <button id="lockBtn" onclick="event.stopPropagation(); toggleLock()"
-        class="player-lock-btn">🔓</button>
-
-      <!-- CUSTOM CONTROLS -->
-      <div id="customControls" class="player-controls">
-
-        <!-- TOP BAR -->
-        <div class="player-top-bar" onclick="event.stopPropagation()">
-          <button id="orientBtn" onclick="toggleOrientation()" class="player-pill-btn">🔄</button>
-          <button id="speedBtn" onclick="cycleSpeed()" class="player-pill-btn">1.0x</button>
-        </div>
-
-        <!-- CENTER PLAY BUTTON -->
-        <div id="centerPlayBtn" onclick="event.stopPropagation(); togglePlay()" class="player-center-btn">
-          <span id="centerPlayIcon">▶</span>
-        </div>
-
-        <!-- SKIP BUTTONS -->
-        <div class="player-skip-left" onclick="event.stopPropagation(); skip(-10)">
-          <span class="player-skip-icon">⟪</span>
-          <span class="player-skip-label">10</span>
-        </div>
-        <div class="player-skip-right" onclick="event.stopPropagation(); skip(10)">
-          <span class="player-skip-icon">⟫</span>
-          <span class="player-skip-label">10</span>
-        </div>
-
-        <!-- BOTTOM BAR -->
-        <div class="player-bottom-bar" onclick="event.stopPropagation()">
-
-          <!-- PROGRESS ROW -->
-          <div class="player-progress-row">
-            <span id="curTime" class="player-time">0:00</span>
-            <div class="player-seek-wrap">
-              <div class="player-seek-track">
-                <div id="seekFill" class="player-seek-fill"></div>
-                <div id="seekBuffer" class="player-seek-buffer"></div>
-              </div>
-              <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1"
-                class="player-seek-input" oninput="onSeek(this.value)" />
-            </div>
-            <span id="durTime" class="player-time">0:00</span>
-          </div>
-
-          <!-- CONTROLS ROW -->
-          <div class="player-controls-row">
-            <span id="playPauseIcon" onclick="togglePlay()" class="player-btn">⏸</span>
-            <span onclick="toggleMute()" id="volIcon" class="player-btn">🔊</span>
-            <input type="range" id="volBar" min="0" max="1" value="1" step="0.05"
-              class="player-vol-input" oninput="onVolume(this.value)" />
-            <span style="flex:1;"></span>
-            <span onclick="toggleFullscreen()" class="player-btn player-btn-lg">⛶</span>
-          </div>
-
-        </div>
+    <div id="playerWrap">
+      <div class="native-player-top">
+        <button id="orientBtn" onclick="toggleOrientation()" class="native-orient-btn">🔄</button>
       </div>
+      <video id="videoPlayer" playsinline controls
+        poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAwMDAiLz48L3N2Zz4=">
+      </video>
     </div>
 
     <button class="back-btn" onclick="backToOrigin()">← Back to videos</button>
@@ -261,226 +208,46 @@
   </div>
 
   <script>
-    // ===== CUSTOM PLAYER LOGIC =====
-    let controlsHideTimer = null;
-    let isLocked = false;
-    const speedOptions = [1, 1.25, 1.5, 2, 0.5];
-    let speedIndex = 0;
-
-    function formatTime(sec) {
-      if (!isFinite(sec) || sec < 0) sec = 0;
-      const m = Math.floor(sec / 60);
-      const s = Math.floor(sec % 60);
-      return m + ':' + (s < 10 ? '0' : '') + s;
-    }
-
-    function togglePlay() {
-      const v = document.getElementById('videoPlayer');
-      if (v.paused) { v.play(); } else { v.pause(); }
-    }
-
-    function skip(amount) {
-      const v = document.getElementById('videoPlayer');
-      v.currentTime = Math.min(Math.max(0, v.currentTime + amount), v.duration || 0);
-      showControls();
-    }
-
-    function onSeek(value) {
-      const v = document.getElementById('videoPlayer');
-      if (v.duration) v.currentTime = (value / 100) * v.duration;
-    }
-
-    function onVolume(value) {
-      const v = document.getElementById('videoPlayer');
-      v.volume = value;
-      document.getElementById('volIcon').textContent = value == 0 ? '🔇' : '🔊';
-    }
-
-    function toggleMute() {
-      const v = document.getElementById('videoPlayer');
-      v.muted = !v.muted;
-      document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
-    }
-
+    // ===== VIDEO PLAYER LOGIC (native controls) =====
     function isCapacitorApp() {
       return window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
     }
 
     function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
-      const isRotated = wrap.classList.contains('fake-landscape');
+      const isRotated = wrap.classList.contains('native-landscape') || wrap.classList.contains('fake-landscape');
       const bottomNav = document.getElementById('bottomNav');
 
       if (window.NativeBridge) {
         if (isRotated) {
           window.NativeBridge.unlockOrientation();
           wrap.classList.remove('native-landscape');
-          wrap.style.zIndex = 'initial';
-          wrap.style.position = '';
-          wrap.style.width = '';
-          wrap.style.height = '';
-          wrap.style.top = '';
-          wrap.style.left = '';
           if (bottomNav) bottomNav.style.display = '';
           document.getElementById('orientBtn').textContent = '🔄';
         } else {
           window.NativeBridge.lockLandscape();
           wrap.classList.add('native-landscape');
-          wrap.style.zIndex = '99999';
           if (bottomNav) bottomNav.style.display = 'none';
           document.getElementById('orientBtn').textContent = '🔁';
         }
       } else {
         if (isRotated) {
           wrap.classList.remove('fake-landscape');
-          wrap.style.zIndex = 'initial';
           if (bottomNav) bottomNav.style.display = '';
           document.getElementById('orientBtn').textContent = '🔄';
         } else {
           wrap.classList.add('fake-landscape');
-          wrap.style.zIndex = '999999';
           if (bottomNav) bottomNav.style.display = 'none';
           document.getElementById('orientBtn').textContent = '🔁';
         }
       }
-    }    
-
-    function cycleSpeed() {
-      speedIndex = (speedIndex + 1) % speedOptions.length;
-      const v = document.getElementById('videoPlayer');
-      v.playbackRate = speedOptions[speedIndex];
-      document.getElementById('speedBtn').textContent = speedOptions[speedIndex] + 'x';
-      showControls();
-    }
-
-    async function toggleFullscreen() {
-      const video = document.getElementById('videoPlayer');
-      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
-
-      if (isCapacitorApp()) {
-        try {
-          const { StatusBar, ScreenOrientation } = Capacitor.Plugins;
-          if (isFs) {
-            await ScreenOrientation.unlock();
-            await StatusBar.show();
-          } else {
-            await ScreenOrientation.lock({ orientation: 'landscape' });
-            await StatusBar.hide();
-          }
-        } catch(e) {
-          console.log('Fullscreen error:', e);
-        }
-      } else {
-        if (isFs) {
-          (document.exitFullscreen || document.webkitExitFullscreen).call(document).catch(function(){});
-        } else if (video.requestFullscreen) {
-          video.requestFullscreen().catch(function(){});
-        } else if (video.webkitEnterFullscreen) {
-          video.webkitEnterFullscreen();
-        }
-      }
-    }
-
-    function toggleLock() {
-      isLocked = !isLocked;
-      const lockBtn = document.getElementById('lockBtn');
-      const controls = document.getElementById('customControls');
-      lockBtn.textContent = isLocked ? '🔒' : '🔓';
-      if (isLocked) {
-        controls.classList.add('controls-hidden');
-      } else {
-        controls.classList.remove('controls-hidden');
-        showControls();
-      }
-    }
-
-    function onPlayerTap(e) {
-      if (isLocked) {
-        document.getElementById('lockBtn').style.display = 'block';
-        clearTimeout(window._lockBtnTimer);
-        window._lockBtnTimer = setTimeout(function() {
-          document.getElementById('lockBtn').style.display = 'none';
-        }, 2000);
-        return;
-      }
-      const controls = document.getElementById('customControls');
-      if (controls.classList.contains('controls-hidden')) {
-        showControls();
-      } else {
-        hideControlsNow();
-      }
-    }
-
-    function showControls() {
-      if (isLocked) return;
-      const controls = document.getElementById('customControls');
-      controls.classList.remove('controls-hidden');
-      document.getElementById('lockBtn').style.display = 'block';
-      clearTimeout(controlsHideTimer);
-      const v = document.getElementById('videoPlayer');
-      if (!v.paused) {
-        controlsHideTimer = setTimeout(hideControlsNow, 3000);
-      }
-    }
-
-    function hideControlsNow() {
-      if (isLocked) return;
-      document.getElementById('customControls').classList.add('controls-hidden');
-      document.getElementById('lockBtn').style.display = 'none';
     }
 
     function setupCustomPlayer() {
       const v = document.getElementById('videoPlayer');
-      isLocked = false;
-      document.getElementById('lockBtn').textContent = '🔓';
-      document.getElementById('lockBtn').style.display = 'none';
-      speedIndex = 0;
       v.playbackRate = 1;
-      document.getElementById('speedBtn').textContent = '1.0x';
-      document.getElementById('playPauseIcon').textContent = '▶';
-      document.getElementById('centerPlayIcon').textContent = '▶';
-      document.getElementById('centerPlayBtn').style.opacity = '1';
-      document.getElementById('centerPlayBtn').style.pointerEvents = 'auto';
-      document.getElementById('seekFill').style.width = '0%';
-      document.getElementById('seekBuffer').style.width = '0%';
-      document.getElementById('customControls').classList.remove('controls-hidden');
-
-      v.onplay = function() {
-        document.getElementById('playPauseIcon').textContent = '⏸';
-        document.getElementById('centerPlayIcon').textContent = '⏸';
-        document.getElementById('centerPlayBtn').style.opacity = '0';
-        document.getElementById('centerPlayBtn').style.pointerEvents = 'none';
-        showControls();
-      };
-      v.onpause = function() {
-        document.getElementById('playPauseIcon').textContent = '▶';
-        document.getElementById('centerPlayIcon').textContent = '▶';
-        document.getElementById('centerPlayBtn').style.opacity = '1';
-        document.getElementById('centerPlayBtn').style.pointerEvents = 'auto';
-        clearTimeout(controlsHideTimer);
-      };
-      v.ontimeupdate = function() {
-        document.getElementById('curTime').textContent = formatTime(v.currentTime);
-        if (v.duration) {
-          const pct = (v.currentTime / v.duration) * 100;
-          document.getElementById('seekBar').value = pct;
-          document.getElementById('seekFill').style.width = pct + '%';
-        }
-      };
-      v.onprogress = function() {
-        if (v.duration && v.buffered.length > 0) {
-          const buffPct = (v.buffered.end(v.buffered.length - 1) / v.duration) * 100;
-          document.getElementById('seekBuffer').style.width = buffPct + '%';
-        }
-      };
-      v.onloadedmetadata = function() {
-        document.getElementById('durTime').textContent = formatTime(v.duration);
-      };
-      v.onvolumechange = function() {
-        document.getElementById('volIcon').textContent = v.muted || v.volume == 0 ? '🔇' : '🔊';
-      };
     }
-    // ===== END CUSTOM PLAYER LOGIC =====
+    // ===== END VIDEO PLAYER LOGIC =====
 
     // Apply saved theme on load
     (function() {
@@ -1127,17 +894,11 @@
       const wrap = document.getElementById('playerWrap');
       wrap.classList.remove('fake-landscape');
       wrap.classList.remove('native-landscape');
-      wrap.style.zIndex = 'initial';
-      wrap.style.position = '';
-      wrap.style.width = '';
-      wrap.style.height = '';
-      wrap.style.top = '';
-      wrap.style.left = '';
       const orientBtn = document.getElementById('orientBtn');
       if (orientBtn) orientBtn.textContent = '🔄';
       const bottomNav = document.getElementById('bottomNav');
       if (bottomNav) bottomNav.style.display = '';
- 
+
       document.getElementById('likeBar').innerHTML = '';
       if (window._progressTimer) clearInterval(window._progressTimer);
       const videoEl = document.getElementById('videoPlayer');
@@ -1147,14 +908,8 @@
       videoEl.onpause = null;
       videoEl.src     = '';
 
-      // Manually reset custom player icon state since pausing right before
-      // clearing src can prevent the onpause event from firing reliably
-      document.getElementById('playPauseIcon').textContent = '▶';
-      document.getElementById('centerPlayIcon').textContent = '▶';
-      document.getElementById('centerPlayBtn').style.opacity = '1';
-      document.getElementById('centerPlayBtn').style.pointerEvents = 'auto';
-      clearTimeout(controlsHideTimer);
       document.getElementById('playerSection').style.display  = 'none';
+      document.getElementById('seriesSection').style.display  = 'none';
       document.getElementById('seriesSection').style.display  = 'none';
       document.getElementById('episodeSection').style.display = 'none';
       document.getElementById('gridSection').style.display    = 'block';
