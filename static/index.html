@@ -102,9 +102,6 @@
   <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
     <div id="playerWrap">
-      <div class="native-player-top">
-        <button id="orientBtn" onclick="toggleOrientation()" class="native-orient-btn">🔄</button>
-      </div>
       <video id="videoPlayer" playsinline controls
         poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAwMDAiLz48L3N2Zz4=">
       </video>
@@ -208,47 +205,6 @@
   </div>
 
   <script>
-    // ===== VIDEO PLAYER LOGIC (native controls) =====
-    function isCapacitorApp() {
-      return window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
-    }
-
-    function toggleOrientation() {
-      const wrap = document.getElementById('playerWrap');
-      const isRotated = wrap.classList.contains('native-landscape') || wrap.classList.contains('fake-landscape');
-      const bottomNav = document.getElementById('bottomNav');
-
-      if (window.NativeBridge) {
-        if (isRotated) {
-          window.NativeBridge.unlockOrientation();
-          wrap.classList.remove('native-landscape');
-          if (bottomNav) bottomNav.style.display = '';
-          document.getElementById('orientBtn').textContent = '🔄';
-        } else {
-          window.NativeBridge.lockLandscape();
-          wrap.classList.add('native-landscape');
-          if (bottomNav) bottomNav.style.display = 'none';
-          document.getElementById('orientBtn').textContent = '🔁';
-        }
-      } else {
-        if (isRotated) {
-          wrap.classList.remove('fake-landscape');
-          if (bottomNav) bottomNav.style.display = '';
-          document.getElementById('orientBtn').textContent = '🔄';
-        } else {
-          wrap.classList.add('fake-landscape');
-          if (bottomNav) bottomNav.style.display = 'none';
-          document.getElementById('orientBtn').textContent = '🔁';
-        }
-      }
-    }
-
-    function setupCustomPlayer() {
-      const v = document.getElementById('videoPlayer');
-      v.playbackRate = 1;
-    }
-    // ===== END VIDEO PLAYER LOGIC =====
-
     // Apply saved theme on load
     (function() {
       const themes = {
