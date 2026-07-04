@@ -116,11 +116,11 @@
 
         <!-- CENTER: play/pause + skip -->
         <div class="miui-center" onclick="event.stopPropagation()">
-          <div class="miui-skip-btn" onclick="playerSkip(-10)">
+	  <div class="miui-skip-btn" onclick="event.stopPropagation(); playerSkip(-10)">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
             <span class="miui-skip-label">10</span>
           </div>
-          <div class="miui-play-btn" onclick="playerTogglePlay()">
+          <div class="miui-play-btn" onclick="event.stopPropagation(); playerTogglePlay()">
             <span id="miuiPlayIcon">▶</span>
           </div>
           <div class="miui-skip-btn" onclick="playerSkip(10)">
