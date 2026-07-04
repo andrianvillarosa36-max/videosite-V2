@@ -335,6 +335,9 @@ button {
   aspect-ratio: 16/9;
   position: relative;
   background: #000;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 #playerWrap video {
@@ -360,32 +363,197 @@ button {
   left: 50% !important;
   width: 100vh !important;
   height: 100vw !important;
-  max-width: 100vh !important;
-  max-height: 100vw !important;
   transform: translate(-50%, -50%) rotate(90deg) !important;
   z-index: 99999 !important;
   background: #000 !important;
   aspect-ratio: auto !important;
 }
 
-.native-player-top {
+/* MIUI Controls overlay */
+.miui-controls {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   z-index: 10;
+  transition: opacity 0.2s;
 }
 
-.native-orient-btn {
-  background: rgba(0,0,0,0.55);
-  border: 1px solid rgba(255,255,255,0.2);
+.miui-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Locked state — only show lock button */
+.miui-locked .miui-top,
+.miui-locked .miui-center,
+.miui-locked .miui-progress-row,
+.miui-locked .miui-ctrl-btn:not(#miuiLockBtn) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Top bar */
+.miui-top {
+  background: linear-gradient(rgba(0,0,0,0.6), transparent);
+  padding: 10px 14px 20px;
+}
+
+.miui-video-title {
   color: #fff;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Center controls */
+.miui-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+}
+
+.miui-play-btn {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: 2px solid rgba(255,255,255,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  color: #fff;
   cursor: pointer;
-  width: auto;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.miui-play-btn:active {
+  background: rgba(255,255,255,0.25);
+}
+
+.miui-skip-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  padding: 8px;
+  opacity: 0.85;
+}
+
+.miui-skip-btn:active { opacity: 1; }
+
+.miui-skip-label {
+  font-size: 0.6rem;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Bottom bar */
+.miui-bottom {
+  background: linear-gradient(transparent, rgba(0,0,0,0.75));
+  padding: 20px 14px 10px;
+}
+
+.miui-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.miui-time {
+  color: rgba(255,255,255,0.9);
+  font-size: 0.68rem;
+  font-weight: 600;
+  min-width: 36px;
+}
+
+.miui-seek-wrap {
+  flex: 1;
+  position: relative;
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.miui-seek-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.miui-buffer {
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+  background: rgba(255,255,255,0.4);
+  width: 0%;
+  transition: width 0.3s;
+}
+
+.miui-fill {
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+  background: #00D4FF;
+  width: 0%;
+}
+
+.miui-seek-input {
+  position: absolute;
+  left: 0; right: 0;
+  width: 100%;
+  height: 20px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  outline: none;
+  margin: 0; padding: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.miui-seek-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px #00D4FF;
+  cursor: pointer;
+}
+
+.miui-controls-row {
+  display: flex;
+  align-items: center;
+}
+
+.miui-ctrl-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 6px;
+  min-width: 36px;
+}
+
+.miui-ctrl-btn:active {
+  background: rgba(255,255,255,0.12);
 }
 
 .skeleton-card {

@@ -101,10 +101,57 @@
 
   <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
-    <div id="playerWrap">
-      <video id="videoPlayer" playsinline controls
+    <div id="playerWrap" onclick="onPlayerTap()">
+      <video id="videoPlayer" playsinline
         poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAwMDAiLz48L3N2Zz4=">
       </video>
+
+      <!-- MIUI-STYLE CONTROLS -->
+      <div id="playerControls" class="miui-controls">
+
+        <!-- TOP BAR: title only -->
+        <div class="miui-top" onclick="event.stopPropagation()">
+          <span id="miuiTitle" class="miui-video-title"></span>
+        </div>
+
+        <!-- CENTER: play/pause + skip -->
+        <div class="miui-center" onclick="event.stopPropagation()">
+          <div class="miui-skip-btn" onclick="playerSkip(-10)">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+            <span class="miui-skip-label">10</span>
+          </div>
+          <div class="miui-play-btn" onclick="playerTogglePlay()">
+            <span id="miuiPlayIcon">▶</span>
+          </div>
+          <div class="miui-skip-btn" onclick="playerSkip(10)">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M16 6h2v12h-2zm-3.5 6L4 6v12z"/></svg>
+            <span class="miui-skip-label">10</span>
+          </div>
+        </div>
+
+        <!-- BOTTOM BAR: progress + controls -->
+        <div class="miui-bottom" onclick="event.stopPropagation()">
+          <div class="miui-progress-row">
+            <span id="miuiCurTime" class="miui-time">0:00</span>
+            <div class="miui-seek-wrap">
+              <div class="miui-seek-track">
+                <div id="miuiBuffer" class="miui-buffer"></div>
+                <div id="miuiFill" class="miui-fill"></div>
+              </div>
+              <input type="range" id="miuiSeek" class="miui-seek-input"
+                min="0" max="100" value="0" step="0.1" oninput="playerSeek(this.value)" />
+            </div>
+            <span id="miuiDurTime" class="miui-time">0:00</span>
+          </div>
+
+          <div class="miui-controls-row">
+            <button id="miuiLockBtn" class="miui-ctrl-btn" onclick="playerToggleLock()">🔓</button>
+            <span style="flex:1"></span>
+            <button id="miuiSpeedBtn" class="miui-ctrl-btn" onclick="playerCycleSpeed()">1.0x</button>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <button class="back-btn" onclick="backToOrigin()">← Back to videos</button>
@@ -599,7 +646,128 @@
       savedScrollY = window.scrollY;
       const videoEl = document.getElementById('videoPlayer');
       videoEl.src   = url;
-      setupCustomPlayer();
+      // ===== MIUI-STYLE PLAYER =====
+    let _playerLocked   = false;
+    let _controlsTimer  = null;
+    let _speedOpts      = [1, 1.25, 1.5, 2, 0.5];
+    let _speedIdx       = 0;
+
+    function formatTime(sec) {
+      if (!isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function setupCustomPlayer() {
+      const v = document.getElementById('videoPlayer');
+      _playerLocked = false;
+      _speedIdx = 0;
+      v.playbackRate = 1;
+      document.getElementById('miuiSpeedBtn').textContent = '1.0x';
+      document.getElementById('miuiLockBtn').textContent = '🔓';
+      document.getElementById('miuiPlayIcon').textContent = '▶';
+      document.getElementById('miuiCurTime').textContent = '0:00';
+      document.getElementById('miuiDurTime').textContent = '0:00';
+      document.getElementById('miuiFill').style.width = '0%';
+      document.getElementById('miuiBuffer').style.width = '0%';
+      document.getElementById('miuiSeek').value = 0;
+      showPlayerControls();
+
+      v.onplay = function() {
+        document.getElementById('miuiPlayIcon').textContent = '⏸';
+        showPlayerControls();
+      };
+      v.onpause = function() {
+        document.getElementById('miuiPlayIcon').textContent = '▶';
+        clearTimeout(_controlsTimer);
+        showPlayerControls();
+      };
+      v.ontimeupdate = function() {
+        document.getElementById('miuiCurTime').textContent = formatTime(v.currentTime);
+        if (v.duration) {
+          const pct = (v.currentTime / v.duration) * 100;
+          document.getElementById('miuiSeek').value = pct;
+          document.getElementById('miuiFill').style.width = pct + '%';
+        }
+      };
+      v.onprogress = function() {
+        if (v.duration && v.buffered.length > 0) {
+          const pct = (v.buffered.end(v.buffered.length - 1) / v.duration) * 100;
+          document.getElementById('miuiBuffer').style.width = pct + '%';
+        }
+      };
+      v.onloadedmetadata = function() {
+        document.getElementById('miuiDurTime').textContent = formatTime(v.duration);
+        document.getElementById('miuiTitle').textContent =
+          document.getElementById('playerTitle').textContent;
+      };
+    }
+
+    function showPlayerControls() {
+      if (_playerLocked) return;
+      const c = document.getElementById('playerControls');
+      c.classList.remove('miui-hidden');
+      clearTimeout(_controlsTimer);
+      const v = document.getElementById('videoPlayer');
+      if (!v.paused) {
+        _controlsTimer = setTimeout(hidePlayerControls, 3500);
+      }
+    }
+
+    function hidePlayerControls() {
+      document.getElementById('playerControls').classList.add('miui-hidden');
+    }
+
+    function onPlayerTap() {
+      if (_playerLocked) return;
+      const c = document.getElementById('playerControls');
+      if (c.classList.contains('miui-hidden')) {
+        showPlayerControls();
+      } else {
+        hidePlayerControls();
+      }
+    }
+
+    function playerTogglePlay() {
+      const v = document.getElementById('videoPlayer');
+      if (v.paused) { v.play(); } else { v.pause(); }
+    }
+
+    function playerSkip(sec) {
+      const v = document.getElementById('videoPlayer');
+      v.currentTime = Math.min(Math.max(0, v.currentTime + sec), v.duration || 0);
+      showPlayerControls();
+    }
+
+    function playerSeek(val) {
+      const v = document.getElementById('videoPlayer');
+      if (v.duration) v.currentTime = (val / 100) * v.duration;
+    }
+
+    function playerCycleSpeed() {
+      _speedIdx = (_speedIdx + 1) % _speedOpts.length;
+      const v = document.getElementById('videoPlayer');
+      v.playbackRate = _speedOpts[_speedIdx];
+      document.getElementById('miuiSpeedBtn').textContent = _speedOpts[_speedIdx] + 'x';
+      showPlayerControls();
+    }
+
+    function playerToggleLock() {
+      _playerLocked = !_playerLocked;
+      const btn = document.getElementById('miuiLockBtn');
+      const c   = document.getElementById('playerControls');
+      btn.textContent = _playerLocked ? '🔒' : '🔓';
+      if (_playerLocked) {
+        // hide everything except lock button
+        c.classList.add('miui-locked');
+        clearTimeout(_controlsTimer);
+      } else {
+        c.classList.remove('miui-locked');
+        showPlayerControls();
+      }
+    }
+    // ===== END MIUI-STYLE PLAYER =====
       window._currentVideoUrl = url;
       authFetch('/api/addview', {
         method: 'POST',
@@ -773,7 +941,128 @@
       document.getElementById('seriesSection').style.display  = 'none';
       document.getElementById('playerSection').style.display  = 'block';
       document.getElementById('videoPlayer').src              = ep.url;
-      setupCustomPlayer();
+      // ===== MIUI-STYLE PLAYER =====
+    let _playerLocked   = false;
+    let _controlsTimer  = null;
+    let _speedOpts      = [1, 1.25, 1.5, 2, 0.5];
+    let _speedIdx       = 0;
+
+    function formatTime(sec) {
+      if (!isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function setupCustomPlayer() {
+      const v = document.getElementById('videoPlayer');
+      _playerLocked = false;
+      _speedIdx = 0;
+      v.playbackRate = 1;
+      document.getElementById('miuiSpeedBtn').textContent = '1.0x';
+      document.getElementById('miuiLockBtn').textContent = '🔓';
+      document.getElementById('miuiPlayIcon').textContent = '▶';
+      document.getElementById('miuiCurTime').textContent = '0:00';
+      document.getElementById('miuiDurTime').textContent = '0:00';
+      document.getElementById('miuiFill').style.width = '0%';
+      document.getElementById('miuiBuffer').style.width = '0%';
+      document.getElementById('miuiSeek').value = 0;
+      showPlayerControls();
+
+      v.onplay = function() {
+        document.getElementById('miuiPlayIcon').textContent = '⏸';
+        showPlayerControls();
+      };
+      v.onpause = function() {
+        document.getElementById('miuiPlayIcon').textContent = '▶';
+        clearTimeout(_controlsTimer);
+        showPlayerControls();
+      };
+      v.ontimeupdate = function() {
+        document.getElementById('miuiCurTime').textContent = formatTime(v.currentTime);
+        if (v.duration) {
+          const pct = (v.currentTime / v.duration) * 100;
+          document.getElementById('miuiSeek').value = pct;
+          document.getElementById('miuiFill').style.width = pct + '%';
+        }
+      };
+      v.onprogress = function() {
+        if (v.duration && v.buffered.length > 0) {
+          const pct = (v.buffered.end(v.buffered.length - 1) / v.duration) * 100;
+          document.getElementById('miuiBuffer').style.width = pct + '%';
+        }
+      };
+      v.onloadedmetadata = function() {
+        document.getElementById('miuiDurTime').textContent = formatTime(v.duration);
+        document.getElementById('miuiTitle').textContent =
+          document.getElementById('playerTitle').textContent;
+      };
+    }
+
+    function showPlayerControls() {
+      if (_playerLocked) return;
+      const c = document.getElementById('playerControls');
+      c.classList.remove('miui-hidden');
+      clearTimeout(_controlsTimer);
+      const v = document.getElementById('videoPlayer');
+      if (!v.paused) {
+        _controlsTimer = setTimeout(hidePlayerControls, 3500);
+      }
+    }
+
+    function hidePlayerControls() {
+      document.getElementById('playerControls').classList.add('miui-hidden');
+    }
+
+    function onPlayerTap() {
+      if (_playerLocked) return;
+      const c = document.getElementById('playerControls');
+      if (c.classList.contains('miui-hidden')) {
+        showPlayerControls();
+      } else {
+        hidePlayerControls();
+      }
+    }
+
+    function playerTogglePlay() {
+      const v = document.getElementById('videoPlayer');
+      if (v.paused) { v.play(); } else { v.pause(); }
+    }
+
+    function playerSkip(sec) {
+      const v = document.getElementById('videoPlayer');
+      v.currentTime = Math.min(Math.max(0, v.currentTime + sec), v.duration || 0);
+      showPlayerControls();
+    }
+
+    function playerSeek(val) {
+      const v = document.getElementById('videoPlayer');
+      if (v.duration) v.currentTime = (val / 100) * v.duration;
+    }
+
+    function playerCycleSpeed() {
+      _speedIdx = (_speedIdx + 1) % _speedOpts.length;
+      const v = document.getElementById('videoPlayer');
+      v.playbackRate = _speedOpts[_speedIdx];
+      document.getElementById('miuiSpeedBtn').textContent = _speedOpts[_speedIdx] + 'x';
+      showPlayerControls();
+    }
+
+    function playerToggleLock() {
+      _playerLocked = !_playerLocked;
+      const btn = document.getElementById('miuiLockBtn');
+      const c   = document.getElementById('playerControls');
+      btn.textContent = _playerLocked ? '🔒' : '🔓';
+      if (_playerLocked) {
+        // hide everything except lock button
+        c.classList.add('miui-locked');
+        clearTimeout(_controlsTimer);
+      } else {
+        c.classList.remove('miui-locked');
+        showPlayerControls();
+      }
+    }
+    // ===== END MIUI-STYLE PLAYER =====
       document.getElementById('playerTitle').textContent      = currentSeries.title + ' — ' + ep.title;
 
       // Refresh likes fresh for this episode
