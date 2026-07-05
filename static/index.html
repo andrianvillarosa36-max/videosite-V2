@@ -102,6 +102,7 @@
       <video id="videoPlayer" playsinline controls
         poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAwMDAiLz48L3N2Zz4=">
       </video>
+    </div>
 
     <button class="back-btn" onclick="backToOrigin()">← Back to videos</button>
     <div class="player-wrap">
@@ -493,12 +494,6 @@
       }
     }
 
-    // ===== MIUI-STYLE PLAYER =====
-    let _playerLocked  = false;
-    let _controlsTimer = null;
-    let _speedOpts     = [1, 1.25, 1.5, 2, 0.5];
-    let _speedIdx      = 0;
-
     function formatTime(sec) {
       if (!isFinite(sec) || sec < 0) sec = 0;
       const m = Math.floor(sec / 60);
@@ -506,109 +501,157 @@
       return m + ':' + (s < 10 ? '0' : '') + s;
     }
 
-    function setupCustomPlayer() {
+    function togglePlay() {
       const v = document.getElementById('videoPlayer');
-      _playerLocked = false;
-      _speedIdx     = 0;
-      v.playbackRate = 1;
-      document.getElementById('miuiSpeedBtn').textContent   = '1.0x';
-      document.getElementById('miuiLockBtn').textContent    = '🔓';
-      document.getElementById('miuiPlayIcon').textContent   = '▶';
-      document.getElementById('miuiCurTime').textContent    = '0:00';
-      document.getElementById('miuiDurTime').textContent    = '0:00';
-      document.getElementById('miuiFill').style.width       = '0%';
-      document.getElementById('miuiBuffer').style.width     = '0%';
-      document.getElementById('miuiSeek').value             = 0;
-      document.getElementById('playerControls').classList.remove('miui-hidden');
-      document.getElementById('playerControls').classList.remove('miui-locked');
-      showPlayerControls();
-
-      v.onplay = function() {
-        document.getElementById('miuiPlayIcon').textContent = '⏸';
-        showPlayerControls();
-      };
-      v.onpause = function() {
-        document.getElementById('miuiPlayIcon').textContent = '▶';
-        clearTimeout(_controlsTimer);
-        showPlayerControls();
-      };
-      v.ontimeupdate = function() {
-        document.getElementById('miuiCurTime').textContent = formatTime(v.currentTime);
-        if (v.duration) {
-          const pct = (v.currentTime / v.duration) * 100;
-          document.getElementById('miuiSeek').value       = pct;
-          document.getElementById('miuiFill').style.width = pct + '%';
-        }
-      };
-      v.onprogress = function() {
-        if (v.duration && v.buffered.length > 0) {
-          document.getElementById('miuiBuffer').style.width =
-            (v.buffered.end(v.buffered.length - 1) / v.duration * 100) + '%';
-        }
-      };
-      v.onloadedmetadata = function() {
-        document.getElementById('miuiDurTime').textContent = formatTime(v.duration);
-        document.getElementById('miuiTitle').textContent   = document.getElementById('playerTitle').textContent;
-      };
+      if (v.paused) { v.play(); } else { v.pause(); }
     }
 
-    function showPlayerControls() {
-      if (_playerLocked) return;
-      const c = document.getElementById('playerControls');
-      c.classList.remove('miui-hidden');
-      clearTimeout(_controlsTimer);
-      if (!document.getElementById('videoPlayer').paused) {
-        _controlsTimer = setTimeout(hidePlayerControls, 3500);
+    function skip(amount) {
+      const v = document.getElementById('videoPlayer');
+      v.currentTime = Math.min(Math.max(0, v.currentTime + amount), v.duration || 0);
+      showControls();
+    }
+
+    function onSeek(value) {
+      const v = document.getElementById('videoPlayer');
+      if (v.duration) v.currentTime = (value / 100) * v.duration;
+    }
+
+    function onVolume(value) {
+      const v = document.getElementById('videoPlayer');
+      v.volume = value;
+      document.getElementById('volIcon').textContent = value == 0 ? '🔇' : '🔊';
+    }
+
+    function toggleMute() {
+      const v = document.getElementById('videoPlayer');
+      v.muted = !v.muted;
+      document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
+    }
+
+    async function toggleOrientation() {
+      const wrap = document.getElementById('playerWrap');
+
+      if (!document.fullscreenElement) {
+        try {
+          await wrap.requestFullscreen();
+        } catch (e) {
+          // ignore, will still try to lock below
+        }
+      }
+
+      if (screen.orientation && screen.orientation.lock) {
+        try {
+          const current = screen.orientation.type || '';
+          if (current.startsWith('landscape')) {
+            await screen.orientation.unlock();
+          } else {
+            await screen.orientation.lock('landscape');
+          }
+        } catch (e) {
+          // some browsers block lock outside fullscreen or unsupported, ignore silently
+        }
       }
     }
 
-    function hidePlayerControls() {
-      document.getElementById('playerControls').classList.add('miui-hidden');
-    }
-
-    function onPlayerTap() {
-      if (_playerLocked) return;
-      const c = document.getElementById('playerControls');
-      if (c.classList.contains('miui-hidden')) showPlayerControls();
-      else hidePlayerControls();
-    }
-
-    function playerTogglePlay() {
+    function cycleSpeed() {
+      speedIndex = (speedIndex + 1) % speedOptions.length;
       const v = document.getElementById('videoPlayer');
-      if (v.paused) v.play(); else v.pause();
+      v.playbackRate = speedOptions[speedIndex];
+      document.getElementById('speedBtn').textContent = speedOptions[speedIndex] + 'x';
+      showControls();
     }
 
-    function playerSkip(sec) {
+    function toggleFullscreen() {
+      const wrap = document.getElementById('playerWrap');
+      if (!document.fullscreenElement) {
+        wrap.requestFullscreen().catch(function() {});
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function toggleLock() {
+      isLocked = !isLocked;
+      const lockBtn = document.getElementById('lockBtn');
+      const controls = document.getElementById('customControls');
+      lockBtn.textContent = isLocked ? '🔒' : '🔓';
+      if (isLocked) {
+        controls.classList.add('controls-hidden');
+      } else {
+        controls.classList.remove('controls-hidden');
+        showControls();
+      }
+    }
+
+    function onPlayerTap(e) {
+      if (isLocked) {
+        document.getElementById('lockBtn').style.display = 'block';
+        clearTimeout(window._lockBtnTimer);
+        window._lockBtnTimer = setTimeout(function() {
+          document.getElementById('lockBtn').style.display = 'none';
+        }, 2000);
+        return;
+      }
+      const controls = document.getElementById('customControls');
+      if (controls.classList.contains('controls-hidden')) {
+        showControls();
+      } else {
+        hideControlsNow();
+      }
+    }
+
+    function showControls() {
+      if (isLocked) return;
+      const controls = document.getElementById('customControls');
+      controls.classList.remove('controls-hidden');
+      document.getElementById('lockBtn').style.display = 'block';
+      clearTimeout(controlsHideTimer);
       const v = document.getElementById('videoPlayer');
-      v.currentTime = Math.min(Math.max(0, v.currentTime + sec), v.duration || 0);
-      showPlayerControls();
+      if (!v.paused) {
+        controlsHideTimer = setTimeout(hideControlsNow, 3000);
+      }
     }
 
-    function playerSeek(val) {
+    function hideControlsNow() {
+      if (isLocked) return;
+      document.getElementById('customControls').classList.add('controls-hidden');
+      document.getElementById('lockBtn').style.display = 'none';
+    }
+
+    function setupCustomPlayer() {
       const v = document.getElementById('videoPlayer');
-      if (v.duration) v.currentTime = (val / 100) * v.duration;
-    }
+      isLocked = false;
+      document.getElementById('lockBtn').textContent = '🔓';
+      document.getElementById('lockBtn').style.display = 'none';
+      speedIndex = 0;
+      v.playbackRate = 1;
+      document.getElementById('speedBtn').textContent = '1.0x';
+      document.getElementById('playPauseIcon').textContent = '▶️';
+      document.getElementById('centerPlayBtn').style.display = 'flex';
+      document.getElementById('customControls').classList.remove('controls-hidden');
 
-    function playerCycleSpeed() {
-      _speedIdx = (_speedIdx + 1) % _speedOpts.length;
-      const v   = document.getElementById('videoPlayer');
-      v.playbackRate = _speedOpts[_speedIdx];
-      document.getElementById('miuiSpeedBtn').textContent = _speedOpts[_speedIdx] + 'x';
-      showPlayerControls();
+      v.onplay = function() {
+        document.getElementById('playPauseIcon').textContent = '⏸️';
+        document.getElementById('centerPlayBtn').style.display = 'none';
+        showControls();
+      };
+      v.onpause = function() {
+        document.getElementById('playPauseIcon').textContent = '▶️';
+        document.getElementById('centerPlayBtn').style.display = 'flex';
+        clearTimeout(controlsHideTimer);
+      };
+      v.ontimeupdate = function() {
+        document.getElementById('curTime').textContent = formatTime(v.currentTime);
+        if (v.duration) document.getElementById('seekBar').value = (v.currentTime / v.duration) * 100;
+      };
+      v.onloadedmetadata = function() {
+        document.getElementById('durTime').textContent = formatTime(v.duration);
+      };
+      v.onvolumechange = function() {
+        document.getElementById('volIcon').textContent = v.muted || v.volume == 0 ? '🔇' : '🔊';
+      };
     }
-
-    function playerToggleLock() {
-      _playerLocked = !_playerLocked;
-      document.getElementById('miuiLockBtn').textContent = _playerLocked ? '🔒' : '🔓';
-      const c = document.getElementById('playerControls');
-      if (_playerLocked) { c.classList.add('miui-locked'); clearTimeout(_controlsTimer); }
-      else { c.classList.remove('miui-locked'); showPlayerControls(); }
-    }
-
-    function isCapacitorApp() {
-      return window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
-    }
-    // ===== END MIUI-STYLE PLAYER =====
 
     async function playVideo(url, title, category, tags) {
       savedScrollY = window.scrollY;
