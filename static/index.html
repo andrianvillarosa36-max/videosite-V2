@@ -659,6 +659,14 @@
     // ===== END MIUI-STYLE PLAYER =====
 
     async function playVideo(url, title, category, tags) {
+      // If running inside the native app, open in MIUI/native video player
+      if (window.NativeBridge && window.NativeBridge.openVideoInNativePlayer) {
+        window.NativeBridge.openVideoInNativePlayer(url, title || '');
+        // Still track the view and save progress via web
+        authFetch('/api/addview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ videoUrl: url }) });
+        return;
+      }
+
       savedScrollY = window.scrollY;
       const videoEl = document.getElementById('videoPlayer');
       videoEl.src   = url;
@@ -777,6 +785,14 @@
       currentEpIndex = idx;
       const ep = currentSeries.episodes[idx];
       window._currentVideoUrl = ep.url;
+
+      // If running inside the native app, open in MIUI/native video player
+      if (window.NativeBridge && window.NativeBridge.openVideoInNativePlayer) {
+        window.NativeBridge.openVideoInNativePlayer(ep.url, currentSeries.title + ' — ' + ep.title);
+        authFetch('/api/addview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ videoUrl: ep.url }) });
+        return;
+      }
+
       document.getElementById('likeBar').innerHTML = '';
       document.getElementById('seriesSection').style.display = 'none';
       document.getElementById('playerSection').style.display = 'block';
