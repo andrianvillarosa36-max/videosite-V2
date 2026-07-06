@@ -101,7 +101,7 @@
 
   <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
-    <button class="back-btn" onclick="goBackAdult()">← Back to 18+ Corner</button>
+    <button class="back-btn" onclick="goBackAdult()">← Back to videos</button>
     <div id="playerWrap" onclick="onPlayerTap(event)">
       <video id="videoPlayer" playsinline poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5>
 
@@ -652,47 +652,51 @@
 
     function setupCustomPlayer() {
       const v = document.getElementById('videoPlayer');
-      _playerLocked = false;
-      _speedIdx = 0;
+      isLocked = false;
+      speedIndex = 0;
       v.playbackRate = 1;
-      document.getElementById('miuiSpeedBtn').textContent = '1.0x';
       document.getElementById('miuiLockBtn').textContent = '🔓';
-      document.getElementById('miuiPlayIcon').textContent = '▶';
-      document.getElementById('miuiCurTime').textContent = '0:00';
-      document.getElementById('miuiDurTime').textContent = '0:00';
-      document.getElementById('miuiFill').style.width = '0%';
+      document.getElementById('speedBtn').textContent = '1.0x';
+      document.getElementById('centerPlayBtn').textContent = '▶️';
       document.getElementById('miuiBuffer').style.width = '0%';
-      document.getElementById('miuiSeek').value = 0;
-      showPlayerControls();
+      document.getElementById('miuiFill').style.width = '0%';
+      document.getElementById('seekBar').value = 0;
+      document.getElementById('curTime').textContent = '0:00';
+      document.getElementById('durTime').textContent = '0:00';
+      document.getElementById('miuiSpinner').style.display = 'none';
+      document.getElementById('customControls').classList.remove('miui-locked', 'miui-hidden');
 
       v.onplay = function() {
-        document.getElementById('miuiPlayIcon').textContent = '⏸';
-        showPlayerControls();
+        document.getElementById('centerPlayBtn').textContent = '⏸️';
+        showControls();
       };
       v.onpause = function() {
-        document.getElementById('miuiPlayIcon').textContent = '▶';
-        clearTimeout(_controlsTimer);
-        showPlayerControls();
+        document.getElementById('centerPlayBtn').textContent = '▶️';
+        clearTimeout(controlsHideTimer);
       };
       v.ontimeupdate = function() {
-        document.getElementById('miuiCurTime').textContent = formatTime(v.currentTime);
+        document.getElementById('curTime').textContent = formatTime(v.currentTime);
         if (v.duration) {
           const pct = (v.currentTime / v.duration) * 100;
-          document.getElementById('miuiSeek').value = pct;
+          document.getElementById('seekBar').value = pct;
           document.getElementById('miuiFill').style.width = pct + '%';
         }
       };
+      v.onloadedmetadata = function() {
+        document.getElementById('durTime').textContent = formatTime(v.duration);
+      };
+      v.onvolumechange = function() {
+        document.getElementById('volIcon').textContent = v.muted || v.volume == 0 ? '🔇' : '🔊';
+      };
       v.onprogress = function() {
-        if (v.duration && v.buffered.length > 0) {
-          const pct = (v.buffered.end(v.buffered.length - 1) / v.duration) * 100;
-          document.getElementById('miuiBuffer').style.width = pct + '%';
+        if (v.buffered.length && v.duration) {
+          const end = v.buffered.end(v.buffered.length - 1);
+          document.getElementById('miuiBuffer').style.width = (end / v.duration * 100) + '%';
         }
       };
-      v.onloadedmetadata = function() {
-        document.getElementById('miuiDurTime').textContent = formatTime(v.duration);
-        document.getElementById('miuiTitle').textContent =
-          document.getElementById('playerTitle').textContent;
-      };
+      v.onwaiting = function() { document.getElementById('miuiSpinner').style.display = 'block'; };
+      v.onplaying = function() { document.getElementById('miuiSpinner').style.display = 'none'; };
+      v.oncanplay = function() { document.getElementById('miuiSpinner').style.display = 'none'; };
     }
 
     function showPlayerControls() {
