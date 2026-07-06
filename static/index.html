@@ -101,66 +101,57 @@
 
   <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
-    <div id="playerWrap" onclick="onPlayerTap()">
-      <video id="videoPlayer" playsinline
-        poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAwMDAiLz48L3N2Zz4=">
-      </video>
+    <button class="back-btn" onclick="goBackAdult()">← Back to 18+ Corner</button>
+    <div id="playerWrap" onclick="onPlayerTap(event)">
+      <video id="videoPlayer" playsinline poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5>
 
-      <!-- MIUI-STYLE CONTROLS -->
-      <div id="playerControls" class="miui-controls">
+      <div id="miuiSpinner" class="miui-spinner"></div>
 
-        <!-- TOP BAR: title only -->
-        <div class="miui-top" onclick="event.stopPropagation()">
-          <span id="miuiTitle" class="miui-video-title"></span>
+      <div id="customControls" class="miui-controls">
+        <div class="miui-top">
+          <div class="miui-video-title" id="miuiTitle"></div>
         </div>
 
-        <!-- CENTER: play/pause + skip -->
         <div class="miui-center" onclick="event.stopPropagation()">
-	  <div class="miui-skip-btn" onclick="event.stopPropagation(); playerSkip(-10)">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+          <div class="miui-skip-btn" onclick="skip(-10)">
+            <span style="font-size:1.3rem;">⏪</span>
             <span class="miui-skip-label">10</span>
           </div>
-          <div class="miui-play-btn" onclick="event.stopPropagation(); playerTogglePlay()">
-            <span id="miuiPlayIcon">▶</span>
-          </div>
-          <div class="miui-skip-btn" onclick="playerSkip(10)">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M16 6h2v12h-2zm-3.5 6L4 6v12z"/></svg>
+          <div class="miui-play-btn" id="centerPlayBtn" onclick="togglePlay()">▶️</div>
+          <div class="miui-skip-btn" onclick="skip(10)">
+            <span style="font-size:1.3rem;">⏩</span>
             <span class="miui-skip-label">10</span>
           </div>
         </div>
 
-        <!-- BOTTOM BAR: progress + controls -->
-        <div class="miui-bottom" onclick="event.stopPropagation()">
-          <div class="miui-progress-row">
-            <span id="miuiCurTime" class="miui-time">0:00</span>
+        <div class="miui-bottom">
+          <div class="miui-progress-row" onclick="event.stopPropagation()">
+            <span class="miui-time" id="curTime">0:00</span>
             <div class="miui-seek-wrap">
               <div class="miui-seek-track">
-                <div id="miuiBuffer" class="miui-buffer"></div>
-                <div id="miuiFill" class="miui-fill"></div>
+                <div class="miui-buffer" id="miuiBuffer"></div>
+                <div class="miui-fill" id="miuiFill"></div>
               </div>
-              <input type="range" id="miuiSeek" class="miui-seek-input"
-                min="0" max="100" value="0" step="0.1" oninput="playerSeek(this.value)" />
+              <input type="range" class="miui-seek-input" id="seekBar" min="0" max="100" value="0" step="0.>
             </div>
-            <span id="miuiDurTime" class="miui-time">0:00</span>
+            <span class="miui-time" id="durTime">0:00</span>
           </div>
-
-          <div class="miui-controls-row">
-            <button id="miuiLockBtn" class="miui-ctrl-btn" onclick="playerToggleLock()">🔓</button>
-            <span style="flex:1"></span>
-            <button id="miuiSpeedBtn" class="miui-ctrl-btn" onclick="playerCycleSpeed()">1.0x</button>
+          <div class="miui-controls-row" onclick="event.stopPropagation()">
+            <button class="miui-ctrl-btn" id="miuiLockBtn" onclick="toggleLock()">🔓</button>
+            <button class="miui-ctrl-btn" id="volIcon" onclick="toggleMute()">🔊</button>
+            <button class="miui-ctrl-btn" id="speedBtn" onclick="cycleSpeed()">1.0x</button>
+            <span style="flex:1;"></span>
+            <button class="miui-ctrl-btn" onclick="toggleOrientation()" style="font-size:1.2rem;">⛶</button>
           </div>
         </div>
-
       </div>
     </div>
 
-    <button class="back-btn" onclick="backToOrigin()">← Back to videos</button>
-    <div class="player-wrap">
+    <div style="padding:16px;">
       <p class="player-title" id="playerTitle"></p>
       <div id="playerTags" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
-      <div id="likeBar" style="display:flex; gap:10px; margin-top:12px;"></div>
+      <div id="likeBar" style="display:flex; gap:10px; margin-top:12px; align-items:center;"></div>
 
-      <!-- EPISODES LIST -->
       <div id="episodeSection" style="display:none; margin-top:16px;">
         <p style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">📺 Episodes</p>
         <div id="episodeList"></div>
