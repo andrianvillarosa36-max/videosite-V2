@@ -508,7 +508,7 @@ button {
   position: absolute;
   left: 0; top: 0;
   height: 100%;
-  background: #00D4FF;
+  background: var(--accent);
   width: 0%;
 }
 
@@ -532,7 +532,7 @@ button {
   height: 14px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 0 0 2px #00D4FF;
+  box-shadow: 0 0 0 2px var(--accent);
   cursor: pointer;
 }
 
@@ -555,6 +555,25 @@ button {
 
 .miui-ctrl-btn:active {
   background: rgba(255,255,255,0.12);
+}
+
+/* Buffering spinner — sits above the controls, unaffected by miui-hidden/miui-locked */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.miui-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border: 3px solid rgba(255,255,255,0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  z-index: 15;
+  display: none;
+  pointer-events: none;
 }
 
 .skeleton-card {

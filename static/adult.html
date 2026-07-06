@@ -35,6 +35,8 @@
 
   <style>
     @keyframes spin { to { transform: rotate(360deg); } }
+    #playerWrap .miui-fill { background: #ff4477; }
+    #playerWrap .miui-seek-input::-webkit-slider-thumb { box-shadow: 0 0 0 2px #ff4477; }
   </style>
 
   <!-- AGE GATE CHECK (re-verifies on direct visit/refresh) -->
@@ -109,32 +111,46 @@
   <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
     <button class="back-btn" onclick="goBackAdult()">← Back to 18+ Corner</button>
-    <div id="playerWrap" style="position:relative; background:#000;" onclick="onPlayerTap(event)">
+    <div id="playerWrap" onclick="onPlayerTap(event)">
       <video id="videoPlayer" playsinline poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAwMDAiLz48L3N2Zz4="></video>
 
-      <button id="lockBtn" onclick="event.stopPropagation(); toggleLock()" style="position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.3); color:#fff; border-radius:6px; padding:6px 8px; font-size:1rem; cursor:pointer; width:auto; z-index:20; display:none;">🔓</button>
+      <div id="miuiSpinner" class="miui-spinner"></div>
 
-      <div id="customControls" style="position:absolute; inset:0; z-index:10; opacity:1; transition:opacity 0.25s;">
-        <div id="centerPlayBtn" onclick="event.stopPropagation(); togglePlay()" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:54px; height:54px; background:rgba(0,0,0,0.55); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.6rem; cursor:pointer;">▶️</div>
-
-        <div style="position:absolute; top:8px; right:8px; display:flex; gap:6px;" onclick="event.stopPropagation()">
-          <button onclick="toggleOrientation()" id="orientBtn" style="background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.3); color:#fff; border-radius:6px; padding:6px 8px; font-size:0.95rem; cursor:pointer; width:auto;">🔄</button>
-          <button onclick="cycleSpeed()" id="speedBtn" style="background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.3); color:#fff; border-radius:6px; padding:6px 8px; font-size:0.8rem; cursor:pointer; width:auto;">1.0x</button>
+      <div id="customControls" class="miui-controls">
+        <div class="miui-top">
+          <div class="miui-video-title" id="miuiTitle"></div>
         </div>
 
-        <div style="position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent, rgba(0,0,0,0.75)); padding:24px 16px 12px;" onclick="event.stopPropagation()">
-          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-            <span id="curTime" style="color:#fff; font-size:0.7rem; min-width:34px;">0:00</span>
-            <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" style="flex:1; height:4px; accent-color:#ff4477;" oninput="onSeek(this.value)" />
-            <span id="durTime" style="color:#fff; font-size:0.7rem; min-width:34px;">0:00</span>
+        <div class="miui-center" onclick="event.stopPropagation()">
+          <div class="miui-skip-btn" onclick="skip(-10)">
+            <span style="font-size:1.3rem;">⏪</span>
+            <span class="miui-skip-label">10</span>
           </div>
-          <div style="display:flex; align-items:center; gap:14px;">
-            <span onclick="togglePlay()" id="playPauseIcon" style="cursor:pointer; font-size:1.1rem;">▶️</span>
-            <span onclick="skip(-10)" style="cursor:pointer; font-size:1rem;">⏪</span>
-            <span onclick="skip(10)" style="cursor:pointer; font-size:1rem;">⏩</span>
-            <span onclick="toggleMute()" id="volIcon" style="cursor:pointer; font-size:1rem;">🔊</span>
-            <input type="range" id="volBar" min="0" max="1" value="1" step="0.05" style="width:50px; height:3px; accent-color:#ff4477;" oninput="onVolume(this.value)" />
-            <span onclick="toggleFullscreen()" style="cursor:pointer; font-size:1.4rem; margin-left:auto; padding:8px 10px; margin-right:4px;">⛶</span>
+          <div class="miui-play-btn" id="centerPlayBtn" onclick="togglePlay()">▶️</div>
+          <div class="miui-skip-btn" onclick="skip(10)">
+            <span style="font-size:1.3rem;">⏩</span>
+            <span class="miui-skip-label">10</span>
+          </div>
+        </div>
+
+        <div class="miui-bottom">
+          <div class="miui-progress-row" onclick="event.stopPropagation()">
+            <span class="miui-time" id="curTime">0:00</span>
+            <div class="miui-seek-wrap">
+              <div class="miui-seek-track">
+                <div class="miui-buffer" id="miuiBuffer"></div>
+                <div class="miui-fill" id="miuiFill"></div>
+              </div>
+              <input type="range" class="miui-seek-input" id="seekBar" min="0" max="100" value="0" step="0.1" oninput="onSeek(this.value)">
+            </div>
+            <span class="miui-time" id="durTime">0:00</span>
+          </div>
+          <div class="miui-controls-row" onclick="event.stopPropagation()">
+            <button class="miui-ctrl-btn" id="miuiLockBtn" onclick="toggleLock()">🔓</button>
+            <button class="miui-ctrl-btn" id="volIcon" onclick="toggleMute()">🔊</button>
+            <button class="miui-ctrl-btn" id="speedBtn" onclick="cycleSpeed()">1.0x</button>
+            <span style="flex:1;"></span>
+            <button class="miui-ctrl-btn" onclick="toggleOrientation()" style="font-size:1.2rem;">⛶</button>
           </div>
         </div>
       </div>
@@ -269,12 +285,8 @@
     function onSeek(value) {
       const v = document.getElementById('videoPlayer');
       if (v.duration) v.currentTime = (value / 100) * v.duration;
-    }
-
-    function onVolume(value) {
-      const v = document.getElementById('videoPlayer');
-      v.volume = value;
-      document.getElementById('volIcon').textContent = value == 0 ? '🔇' : '🔊';
+      document.getElementById('miuiFill').style.width = value + '%';
+      showControls();
     }
 
     function toggleMute() {
@@ -285,27 +297,35 @@
 
     async function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
+      const isLandscape = wrap.classList.contains('native-landscape') || wrap.classList.contains('fake-landscape');
+
+      if (isLandscape) {
+        if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) {} }
+        if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch (e) {} }
+        if (window.NativeBridge && window.NativeBridge.unlockOrientation) { try { window.NativeBridge.unlockOrientation(); } catch (e) {} }
+        wrap.classList.remove('native-landscape', 'fake-landscape');
+        return;
+      }
 
       if (!document.fullscreenElement) {
-        try {
-          await wrap.requestFullscreen();
-        } catch (e) {
+        try { await wrap.requestFullscreen(); } catch (e) {
           // ignore, will still try to lock below
         }
       }
 
+      let locked = false;
       if (screen.orientation && screen.orientation.lock) {
         try {
-          const current = screen.orientation.type || '';
-          if (current.startsWith('landscape')) {
-            await screen.orientation.unlock();
-          } else {
-            await screen.orientation.lock('landscape');
-          }
+          await screen.orientation.lock('landscape');
+          locked = true;
         } catch (e) {
-          // some browsers block lock outside fullscreen or unsupported, ignore silently
+          // unsupported or blocked (e.g. iOS Safari) — fall back to the CSS rotate trick
         }
       }
+      if (window.NativeBridge && window.NativeBridge.lockOrientation) {
+        try { window.NativeBridge.lockOrientation(); locked = true; } catch (e) {}
+      }
+      wrap.classList.add(locked ? 'native-landscape' : 'fake-landscape');
     }
 
     function cycleSpeed() {
@@ -316,39 +336,24 @@
       showControls();
     }
 
-    function toggleFullscreen() {
-      const wrap = document.getElementById('playerWrap');
-      if (!document.fullscreenElement) {
-        wrap.requestFullscreen().catch(function() {});
-      } else {
-        document.exitFullscreen();
-      }
-    }
-
     function toggleLock() {
       isLocked = !isLocked;
-      const lockBtn = document.getElementById('lockBtn');
       const controls = document.getElementById('customControls');
-      lockBtn.textContent = isLocked ? '🔒' : '🔓';
+      document.getElementById('miuiLockBtn').textContent = isLocked ? '🔒' : '🔓';
       if (isLocked) {
-        controls.classList.add('controls-hidden');
+        clearTimeout(controlsHideTimer);
+        controls.classList.remove('miui-hidden');
+        controls.classList.add('miui-locked');
       } else {
-        controls.classList.remove('controls-hidden');
+        controls.classList.remove('miui-locked');
         showControls();
       }
     }
 
     function onPlayerTap(e) {
-      if (isLocked) {
-        document.getElementById('lockBtn').style.display = 'block';
-        clearTimeout(window._lockBtnTimer);
-        window._lockBtnTimer = setTimeout(function() {
-          document.getElementById('lockBtn').style.display = 'none';
-        }, 2000);
-        return;
-      }
+      if (isLocked) return;
       const controls = document.getElementById('customControls');
-      if (controls.classList.contains('controls-hidden')) {
+      if (controls.classList.contains('miui-hidden')) {
         showControls();
       } else {
         hideControlsNow();
@@ -358,8 +363,7 @@
     function showControls() {
       if (isLocked) return;
       const controls = document.getElementById('customControls');
-      controls.classList.remove('controls-hidden');
-      document.getElementById('lockBtn').style.display = 'block';
+      controls.classList.remove('miui-hidden');
       clearTimeout(controlsHideTimer);
       const v = document.getElementById('videoPlayer');
       if (!v.paused) {
@@ -369,35 +373,40 @@
 
     function hideControlsNow() {
       if (isLocked) return;
-      document.getElementById('customControls').classList.add('controls-hidden');
-      document.getElementById('lockBtn').style.display = 'none';
+      document.getElementById('customControls').classList.add('miui-hidden');
     }
 
     function setupCustomPlayer() {
       const v = document.getElementById('videoPlayer');
       isLocked = false;
-      document.getElementById('lockBtn').textContent = '🔓';
-      document.getElementById('lockBtn').style.display = 'none';
       speedIndex = 0;
       v.playbackRate = 1;
+      document.getElementById('miuiLockBtn').textContent = '🔓';
       document.getElementById('speedBtn').textContent = '1.0x';
-      document.getElementById('playPauseIcon').textContent = '▶️';
-      document.getElementById('centerPlayBtn').style.display = 'flex';
-      document.getElementById('customControls').classList.remove('controls-hidden');
+      document.getElementById('centerPlayBtn').textContent = '▶️';
+      document.getElementById('miuiBuffer').style.width = '0%';
+      document.getElementById('miuiFill').style.width = '0%';
+      document.getElementById('seekBar').value = 0;
+      document.getElementById('curTime').textContent = '0:00';
+      document.getElementById('durTime').textContent = '0:00';
+      document.getElementById('miuiSpinner').style.display = 'none';
+      document.getElementById('customControls').classList.remove('miui-locked', 'miui-hidden');
 
       v.onplay = function() {
-        document.getElementById('playPauseIcon').textContent = '⏸️';
-        document.getElementById('centerPlayBtn').style.display = 'none';
+        document.getElementById('centerPlayBtn').textContent = '⏸️';
         showControls();
       };
       v.onpause = function() {
-        document.getElementById('playPauseIcon').textContent = '▶️';
-        document.getElementById('centerPlayBtn').style.display = 'flex';
+        document.getElementById('centerPlayBtn').textContent = '▶️';
         clearTimeout(controlsHideTimer);
       };
       v.ontimeupdate = function() {
         document.getElementById('curTime').textContent = formatTime(v.currentTime);
-        if (v.duration) document.getElementById('seekBar').value = (v.currentTime / v.duration) * 100;
+        if (v.duration) {
+          const pct = (v.currentTime / v.duration) * 100;
+          document.getElementById('seekBar').value = pct;
+          document.getElementById('miuiFill').style.width = pct + '%';
+        }
       };
       v.onloadedmetadata = function() {
         document.getElementById('durTime').textContent = formatTime(v.duration);
@@ -405,6 +414,15 @@
       v.onvolumechange = function() {
         document.getElementById('volIcon').textContent = v.muted || v.volume == 0 ? '🔇' : '🔊';
       };
+      v.onprogress = function() {
+        if (v.buffered.length && v.duration) {
+          const end = v.buffered.end(v.buffered.length - 1);
+          document.getElementById('miuiBuffer').style.width = (end / v.duration * 100) + '%';
+        }
+      };
+      v.onwaiting = function() { document.getElementById('miuiSpinner').style.display = 'block'; };
+      v.onplaying = function() { document.getElementById('miuiSpinner').style.display = 'none'; };
+      v.oncanplay = function() { document.getElementById('miuiSpinner').style.display = 'none'; };
     }
 
     async function playVideoAdult(url, title, category, tags) {
@@ -437,6 +455,7 @@
         }
       }, 5000);
       document.getElementById('playerTitle').textContent = title;
+      document.getElementById('miuiTitle').textContent = title;
       authFetch('/api/addview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -637,6 +656,11 @@
     }
 
     function goBackAdult() {
+      if (document.fullscreenElement) { document.exitFullscreen().catch(function() {}); }
+      if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch (e) {} }
+      if (window.NativeBridge) window.NativeBridge.unlockOrientation();
+      const wrap = document.getElementById('playerWrap');
+      wrap.classList.remove('fake-landscape', 'native-landscape');
       if (window._progressTimerAdult) clearInterval(window._progressTimerAdult);
       const videoEl = document.getElementById('videoPlayer');
       videoEl.pause();
