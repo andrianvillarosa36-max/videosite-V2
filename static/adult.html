@@ -295,6 +295,18 @@
       document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
     }
 
+    function hideStatusBar() {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.StatusBar) {
+        window.Capacitor.Plugins.StatusBar.hide().catch(function() {});
+      }
+    }
+
+    function showStatusBar() {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.StatusBar) {
+        window.Capacitor.Plugins.StatusBar.show().catch(function() {});
+      }
+    }
+
     async function toggleOrientation() {
       const wrap = document.getElementById('playerWrap');
       const isLandscape = wrap.classList.contains('native-landscape') || wrap.classList.contains('fake-landscape');
@@ -306,6 +318,7 @@
         } else if (screen.orientation && screen.orientation.unlock) {
           try { screen.orientation.unlock(); } catch (e) {}
         }
+        showStatusBar();
         wrap.classList.remove('native-landscape', 'fake-landscape');
         return;
       }
@@ -329,6 +342,7 @@
           // unsupported or blocked (e.g. iOS Safari, or a plain mobile browser) — fall back to the CSS rotate trick
         }
       }
+      hideStatusBar();
       wrap.classList.add(locked ? 'native-landscape' : 'fake-landscape');
     }
 
@@ -663,6 +677,7 @@
       if (document.fullscreenElement) { document.exitFullscreen().catch(function() {}); }
       if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch (e) {} }
       if (window.NativeBridge) window.NativeBridge.unlockOrientation();
+      showStatusBar();
       const wrap = document.getElementById('playerWrap');
       wrap.classList.remove('fake-landscape', 'native-landscape');
       if (window._progressTimerAdult) clearInterval(window._progressTimerAdult);
