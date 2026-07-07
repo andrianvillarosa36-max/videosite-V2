@@ -576,8 +576,11 @@
 
       if (isLandscape) {
         if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) {} }
-        if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch (e) {} }
-        if (window.NativeBridge && window.NativeBridge.unlockOrientation) { try { window.NativeBridge.unlockOrientation(); } catch (e) {} }
+        if (window.NativeBridge && window.NativeBridge.unlockOrientation) {
+          try { window.NativeBridge.unlockOrientation(); } catch (e) {}
+        } else if (screen.orientation && screen.orientation.unlock) {
+          try { screen.orientation.unlock(); } catch (e) {}
+        }
         wrap.classList.remove('native-landscape', 'fake-landscape');
         return;
       }
@@ -589,16 +592,17 @@
       }
 
       let locked = false;
-      if (screen.orientation && screen.orientation.lock) {
+      if (window.NativeBridge && window.NativeBridge.lockLandscape) {
+        // Inside the wrapped app — this calls setRequestedOrientation() directly on the
+        // Activity, which is far more reliable than the WebView's Orientation API below.
+        try { window.NativeBridge.lockLandscape(); locked = true; } catch (e) {}
+      } else if (screen.orientation && screen.orientation.lock) {
         try {
           await screen.orientation.lock('landscape');
           locked = true;
         } catch (e) {
-          // unsupported or blocked (e.g. iOS Safari) — fall back to the CSS rotate trick
+          // unsupported or blocked (e.g. iOS Safari, or a plain mobile browser) — fall back to the CSS rotate trick
         }
-      }
-      if (window.NativeBridge && window.NativeBridge.lockOrientation) {
-        try { window.NativeBridge.lockOrientation(); locked = true; } catch (e) {}
       }
       wrap.classList.add(locked ? 'native-landscape' : 'fake-landscape');
     }
