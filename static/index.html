@@ -9,7 +9,6 @@
   <meta name="theme-color" content="#0D1117" />
   <link rel="icon" href="/icon-512.png" />
   <script>
-    // Load Capacitor bridge only when running inside the native app
     if (window.location.protocol !== 'http:' || window.Capacitor) {
       document.write('<script src="capacitor://localhost/capacitor.js"><\/script>');
     }
@@ -22,7 +21,6 @@
   </div>
 
   <div id="splashScreen" style="position:fixed; inset:0; background:#0D1117; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; transition:opacity 0.4s ease;">
-
     <div style="position:relative; width:90%; max-width:320px; background:#0D1B2A; border:4px solid #fff; border-radius:14px; padding:24px 16px; display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:50px;">
       <span style="font-size:1.8rem; position:absolute; top:8px; left:14px;">🐥</span>
       <span style="font-size:1.8rem; position:absolute; top:10px; right:14px;">🦀</span>
@@ -31,7 +29,6 @@
       <span style="font-size:2.2rem;">🌽</span>
       <span style="color:#FFD700; font-size:1.8rem; font-weight:900; text-shadow:2px 2px 0 #000;">AnimeCorn</span>
     </div>
-
     <div style="font-size:1.6rem; margin-bottom:6px;" id="splashWalker">🦄</div>
     <div style="width:220px; height:18px; background:#0D1B2A; border:3px solid #fff; border-radius:999px; overflow:hidden; position:relative;">
       <div id="splashProgressBar" style="width:0%; height:100%; background:#0047AB; transition:width 0.25s ease;"></div>
@@ -101,56 +98,50 @@
 
   <!-- VIDEO PLAYER (hidden by default) -->
   <div id="playerSection" style="display:none;">
-    <div id="playerWrap" onclick="onPlayerTap()">
+    <div id="playerWrap" onclick="onPlayerTap(event)">
       <video id="videoPlayer" playsinline
         poster="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAwMDAiLz48L3N2Zz4=">
       </video>
 
-      <!-- MIUI-STYLE CONTROLS -->
-      <div id="playerControls" class="miui-controls">
+      <div id="miuiSpinner" class="miui-spinner"></div>
 
-        <!-- TOP BAR: title only -->
-        <div class="miui-top" onclick="event.stopPropagation()">
-          <span id="miuiTitle" class="miui-video-title"></span>
+      <div id="customControls" class="miui-controls">
+        <div class="miui-top">
+          <div class="miui-video-title" id="miuiTitle"></div>
         </div>
 
-        <!-- CENTER: play/pause + skip -->
         <div class="miui-center" onclick="event.stopPropagation()">
-	  <div class="miui-skip-btn" onclick="event.stopPropagation(); playerSkip(-10)">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+          <div class="miui-skip-btn" onclick="skip(-10)">
+            <span style="font-size:1.3rem;">⏪</span>
             <span class="miui-skip-label">10</span>
           </div>
-          <div class="miui-play-btn" onclick="event.stopPropagation(); playerTogglePlay()">
-            <span id="miuiPlayIcon">▶</span>
-          </div>
-          <div class="miui-skip-btn" onclick="playerSkip(10)">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M16 6h2v12h-2zm-3.5 6L4 6v12z"/></svg>
+          <div class="miui-play-btn" id="centerPlayBtn" onclick="togglePlay()">▶️</div>
+          <div class="miui-skip-btn" onclick="skip(10)">
+            <span style="font-size:1.3rem;">⏩</span>
             <span class="miui-skip-label">10</span>
           </div>
         </div>
 
-        <!-- BOTTOM BAR: progress + controls -->
-        <div class="miui-bottom" onclick="event.stopPropagation()">
-          <div class="miui-progress-row">
-            <span id="miuiCurTime" class="miui-time">0:00</span>
+        <div class="miui-bottom">
+          <div class="miui-progress-row" onclick="event.stopPropagation()">
+            <span class="miui-time" id="curTime">0:00</span>
             <div class="miui-seek-wrap">
               <div class="miui-seek-track">
-                <div id="miuiBuffer" class="miui-buffer"></div>
-                <div id="miuiFill" class="miui-fill"></div>
+                <div class="miui-buffer" id="miuiBuffer"></div>
+                <div class="miui-fill" id="miuiFill"></div>
               </div>
-              <input type="range" id="miuiSeek" class="miui-seek-input"
-                min="0" max="100" value="0" step="0.1" oninput="playerSeek(this.value)" />
+              <input type="range" class="miui-seek-input" id="seekBar" min="0" max="100" value="0" step="0.1" oninput="onSeek(this.value)">
             </div>
-            <span id="miuiDurTime" class="miui-time">0:00</span>
+            <span class="miui-time" id="durTime">0:00</span>
           </div>
-
-          <div class="miui-controls-row">
-            <button id="miuiLockBtn" class="miui-ctrl-btn" onclick="playerToggleLock()">🔓</button>
-            <span style="flex:1"></span>
-            <button id="miuiSpeedBtn" class="miui-ctrl-btn" onclick="playerCycleSpeed()">1.0x</button>
+          <div class="miui-controls-row" onclick="event.stopPropagation()">
+            <button class="miui-ctrl-btn" id="miuiLockBtn" onclick="toggleLock()">🔓</button>
+            <button class="miui-ctrl-btn" id="volIcon" onclick="toggleMute()">🔊</button>
+            <button class="miui-ctrl-btn" id="speedBtn" onclick="cycleSpeed()">1.0x</button>
+            <span style="flex:1;"></span>
+            <button class="miui-ctrl-btn" onclick="toggleOrientation()" style="font-size:1.2rem;">⛶</button>
           </div>
         </div>
-
       </div>
     </div>
 
@@ -160,13 +151,11 @@
       <div id="playerTags" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
       <div id="likeBar" style="display:flex; gap:10px; margin-top:12px;"></div>
 
-      <!-- EPISODES LIST -->
       <div id="episodeSection" style="display:none; margin-top:16px;">
         <p style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">📺 Episodes</p>
         <div id="episodeList"></div>
       </div>
 
-      <!-- COMMENTS -->
       <div style="margin-top:16px;">
         <p style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">💬 Comments</p>
         <div style="display:flex; gap:8px; margin-bottom:14px;">
@@ -182,20 +171,15 @@
     </div>
   </div>
 
-  <!-- SERIES EPISODE PICKER (hidden by default) -->
+  <!-- SERIES EPISODE PICKER -->
   <div id="seriesSection" style="display:none;">
     <button class="back-btn" onclick="backToOrigin()">← Back to videos</button>
     <div style="padding:16px;">
       <p id="seriesTitle" style="font-size:1.1rem; font-weight:700; margin-bottom:10px;"></p>
-      <!-- Favorite/rating now shown inside the episode player itself -->
       <div id="seriesRatingBox" style="margin-bottom:14px;"></div>
-
       <div id="seriesTags" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;"></div>
-
       <p style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">📺 Episodes</p>
       <div id="seriesEpisodes"></div>
-
-      <!-- COMMENTS -->
       <div style="margin-top:16px;">
         <p style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">💬 Comments</p>
         <div style="display:flex; gap:8px; margin-bottom:14px;">
@@ -205,7 +189,6 @@
         </div>
         <div id="seriesCommentList"></div>
       </div>
-
       <p style="font-size:0.9rem; font-weight:700; margin-top:16px; margin-bottom:10px;">More like this</p>
       <div id="seriesMore" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;"></div>
     </div>
@@ -240,7 +223,6 @@
 
   <div id="gridSection">
     <div class="video-grid grid-2" id="videoGrid">
-      <!-- Skeleton placeholders shown while videos load -->
       <div class="skeleton-card"></div>
       <div class="skeleton-card"></div>
       <div class="skeleton-card"></div>
@@ -252,7 +234,6 @@
   </div>
 
   <script>
-    // Apply saved theme on load
     (function() {
       const themes = {
         dark:       { bg:'#0D1117', card:'#1C2333', text:'#ffffff', border:'#30363D', muted:'#8B949E', accent:'#00D4FF' },
@@ -276,7 +257,6 @@
 
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     if (!user) window.location.href = '/login.html';
-   
     const token = localStorage.getItem('token');
 
     function authFetch(url, options) {
@@ -288,13 +268,17 @@
 
     let currentCategory = 'All';
     let savedScrollY = 0;
+    let controlsHideTimer = null;
+    let isLocked = false;
+    const speedOptions = [1, 1.25, 1.5, 2, 0.5];
+    let speedIndex = 0;
     let currentPage  = 1;
     const perPage    = 20;
-    let allVideos = [];
-    let allRatings = [];
-    let allProgress = [];
+    let allVideos    = [];
+    let allRatings   = [];
+    let allProgress  = [];
     let allFavorites = [];
-    let allLikes = [];
+    let allLikes     = [];
 
     const adultCategories = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
 
@@ -310,30 +294,28 @@
         const res = await fetch(url);
         if (!res.ok) return fallback;
         return await res.json();
-      } catch (e) {
-        return fallback;
-      }
+      } catch (e) { return fallback; }
     }
 
     function setSplashProgress(pct) {
-      const bar = document.getElementById('splashProgressBar');
+      const bar    = document.getElementById('splashProgressBar');
       const walker = document.getElementById('splashWalker');
-      if (bar) bar.style.width = pct + '%';
+      if (bar)    bar.style.width = pct + '%';
       if (walker) walker.style.transform = 'translateX(' + ((pct - 50) * 1.6) + 'px)';
     }
 
     async function loadVideos() {
-      const all     = await safeFetchJson('/api/videos', []);
-      allVideos     = all.filter(function(v) { return !adultCategories.includes(v.category); });
+      const all   = await safeFetchJson('/api/videos', []);
+      allVideos   = all.filter(v => !adultCategories.includes(v.category));
       setSplashProgress(20);
-      allRatings    = await safeFetchJson('/api/ratings', []);
+      allRatings  = await safeFetchJson('/api/ratings', []);
       setSplashProgress(40);
-      allProgress   = await safeFetchJson('/api/progress?username=' + user.username, []);
+      allProgress = await safeFetchJson('/api/progress?username=' + user.username, []);
       setSplashProgress(60);
       const favData = await safeFetchJson('/api/favorites?username=' + user.username, []);
       allFavorites  = favData.map(f => f.videoUrl);
       setSplashProgress(80);
-      allLikes      = await safeFetchJson('/api/likes', []);
+      allLikes    = await safeFetchJson('/api/likes', []);
       setSplashProgress(100);
       renderVideos();
     }
@@ -341,21 +323,18 @@
     function renderPopularRows() {
       const scored = allVideos.map(function(v) {
         const id    = v.type === 'series' ? (v.filename || v.title) : (v.url || '');
-        const likes = allLikes.filter(function(l) { return l.videoUrl === id; });
-        const likeCount = likes.filter(function(l) { return l.action === 'like'; }).length;
-        const disCount  = likes.filter(function(l) { return l.action === 'dislike'; }).length;
-        const views     = v.views || 0;
-        const score     = (likeCount - disCount) + views;
+        const likes = allLikes.filter(l => l.videoUrl === id);
+        const score = likes.filter(l => l.action === 'like').length
+                    - likes.filter(l => l.action === 'dislike').length
+                    + (v.views || 0);
         return { v, score };
       });
-
-      const mostPopular  = scored.slice().sort(function(a,b) { return b.score - a.score; }).slice(0, 5);
-      const leastPopular = scored.slice().sort(function(a,b) { return a.score - b.score; }).slice(0, 5);
+      const mostPopular  = scored.slice().sort((a,b) => b.score - a.score).slice(0, 5);
+      const leastPopular = scored.slice().sort((a,b) => a.score - b.score).slice(0, 5);
 
       function buildPopularCard(item) {
         const thumbStyle = item.v.thumb
-          ? 'background-image:url(' + item.v.thumb + '); background-size:cover; background-position:center;'
-          : '';
+          ? 'background-image:url(' + item.v.thumb + '); background-size:cover; background-position:center;' : '';
         const div = document.createElement('div');
         div.style.cssText = 'flex-shrink:0; width:100px; cursor:pointer;';
         div.innerHTML =
@@ -365,55 +344,32 @@
               '<div style="color:#fff; font-size:0.6rem; font-weight:600; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">' + item.v.title + '</div>' +
             '</div>' +
           '</div>';
-        div.addEventListener('click', function() {
+        div.addEventListener('click', () => {
           if (item.v.type === 'series') openSeries(item.v);
           else playVideo(item.v.url, item.v.title, item.v.category, item.v.tags);
         });
         return div;
       }
 
-      const mostRow  = document.getElementById('mostPopularRow');
+      const mostRow   = document.getElementById('mostPopularRow');
       const leastRow2 = document.getElementById('leastPopularRow');
-      mostRow.innerHTML  = '';
-      leastRow2.innerHTML = '';
-
-      if (mostPopular.length === 0) {
-        mostRow.innerHTML = '<p style="color:#8B949E; font-size:0.78rem;">No data yet.</p>';
-      } else {
-        mostPopular.forEach(function(item) { mostRow.appendChild(buildPopularCard(item)); });
-      }
-
-      if (leastPopular.length === 0) {
-        leastRow2.innerHTML = '<p style="color:#8B949E; font-size:0.78rem;">No data yet.</p>';
-      } else {
-        leastPopular.forEach(function(item) { leastRow2.appendChild(buildPopularCard(item)); });
-      }
+      if (mostRow)   mostRow.innerHTML  = mostPopular.length  ? '' : '<p style="color:#8B949E; font-size:0.78rem;">No data yet.</p>';
+      if (leastRow2) leastRow2.innerHTML = leastPopular.length ? '' : '<p style="color:#8B949E; font-size:0.78rem;">No data yet.</p>';
+      if (mostRow)   mostPopular.forEach(i => mostRow.appendChild(buildPopularCard(i)));
+      if (leastRow2) leastPopular.forEach(i => leastRow2.appendChild(buildPopularCard(i)));
     }
 
     function renderContinueWatching() {
       const section = document.getElementById('continueWatchingSection');
-      const row = document.getElementById('continueWatchingRow');
-
-      const inProgress = allProgress.filter(function(p) {
-        return p.current > 5 && !p.watched;
-      });
-
-      if (!inProgress.length) {
-        section.style.display = 'none';
-        return;
-      }
-
+      const row     = document.getElementById('continueWatchingRow');
+      const inProgress = allProgress.filter(p => p.current > 5 && !p.watched);
+      if (!inProgress.length) { section.style.display = 'none'; return; }
       section.style.display = 'block';
       row.innerHTML = '';
-
       inProgress.forEach(function(p) {
-        const v = allVideos.find(function(vv) {
-          return (vv.type === 'series' ? vv.filename : vv.url) === p.videoUrl;
-        });
+        const v = allVideos.find(vv => (vv.type === 'series' ? vv.filename : vv.url) === p.videoUrl);
         if (!v) return;
-
-        const pct = v.episodes ? 0 : Math.min(100, Math.round((p.current / (p.duration || 1)) * 100));
-
+        const pct  = v.episodes ? 0 : Math.min(100, Math.round((p.current / (p.duration || 1)) * 100));
         const card = document.createElement('div');
         card.className = 'cw-card';
         card.innerHTML =
@@ -421,19 +377,16 @@
           '<div class="cw-progress-track"></div>' +
           '<div class="cw-progress-bar" style="width:' + pct + '%;"></div>' +
           '<div class="cw-title">' + escapeHTML(v.title) + '</div>';
-
-        card.addEventListener('click', function() {
+        card.addEventListener('click', () => {
           if (v.type === 'series') openSeries(v);
           else playVideo(v.url, v.title, v.category, v.tags);
         });
-
         row.appendChild(card);
       });
     }
 
     function renderVideos() {
       const grid = document.getElementById('videoGrid');
-
       const filtered = currentCategory === 'All' ? allVideos
         : currentCategory === 'Favorites'
         ? allVideos.filter(v => allFavorites.includes(v.url || ''))
@@ -450,49 +403,42 @@
 
       const totalPages = Math.ceil(filtered.length / perPage);
       if (currentPage > totalPages) currentPage = 1;
-      const start  = (currentPage - 1) * perPage;
-      const paged  = filtered.slice(start, start + perPage);
-
+      const paged = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
       grid.innerHTML = '';
       window._videos = paged;
 
       paged.forEach(function(v) {
         const videoUrl     = v.url || '';
         const ratingId     = v.type === 'series' ? (v.filename || v.title) : videoUrl;
-        const videoRatings = allRatings.filter(function(r) { return r.videoUrl === ratingId; });
-        const avg = videoRatings.length
-          ? (videoRatings.reduce(function(a,b) { return a + b.rating; }, 0) / videoRatings.length).toFixed(1)
-          : null;
-        const myRating = allRatings.find(function(r) { return r.videoUrl === ratingId && r.username === user.username; });
+        const videoRatings = allRatings.filter(r => r.videoUrl === ratingId);
+        const avg          = videoRatings.length
+          ? (videoRatings.reduce((a,b) => a + b.rating, 0) / videoRatings.length).toFixed(1) : null;
 
         let stars = '';
         const fullStars = avg ? Math.round(avg) : 0;
         for (let s = 1; s <= 5; s++) {
-          const color = s <= fullStars ? '#FFD700' : '#30363D';
-          stars += '<span style="font-size:1rem; color:' + color + ';">★</span>';
+          stars += '<span style="font-size:1rem; color:' + (s <= fullStars ? '#FFD700' : '#30363D') + ';">★</span>';
         }
 
-        const card = document.createElement('div');
-        card.className = 'video-card';
         const thumbStyle = v.thumb
-          ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;'
-          : '';
-        const prog     = allProgress.find(function(p) { return p.videoUrl === videoUrl; });
-        const isFav    = allFavorites.includes(videoUrl);
-        const watched  = prog && prog.watched;
-        const continu  = prog && !prog.watched && prog.current > 0;
-        const pct      = prog && prog.duration > 0 ? (prog.current / prog.duration * 100).toFixed(0) : 0;
+          ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;' : '';
+        const prog    = allProgress.find(p => p.videoUrl === videoUrl);
+        const isFav   = allFavorites.includes(videoUrl);
+        const watched = prog && prog.watched;
+        const continu = prog && !prog.watched && prog.current > 0;
+        const pct     = prog && prog.duration > 0 ? (prog.current / prog.duration * 100).toFixed(0) : 0;
 
-        // Generate Tag badges if they exist for the video block array
         let tagBadgesHtml = '';
         if (v.tags && v.tags.length > 0) {
-          tagBadgesHtml += '<div class="thumb-tags" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">';
-          v.tags.forEach(function(t) {
+          tagBadgesHtml = '<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">';
+          v.tags.forEach(t => {
             tagBadgesHtml += '<span style="font-size:0.65rem; background:rgba(0,0,0,0.6); color:#8B949E; padding:2px 6px; border-radius:4px;">#' + t + '</span>';
           });
           tagBadgesHtml += '</div>';
         }
 
+        const card = document.createElement('div');
+        card.className = 'video-card';
         card.innerHTML =
           '<div class="thumbnail" style="' + thumbStyle + '">' +
            (watched ? '<div class="thumb-badge" style="background:#00dd66; color:#000;">✓ Watched</div>' :
@@ -506,22 +452,17 @@
                '<span class="fav-heart" onclick="event.stopPropagation(); toggleFav(\'' + videoUrl.replace(/'/g,"\\'") + '\')" style="cursor:pointer;">' + (isFav ? '❤️' : '🤍') + '</span>' +
              '</div>' +
              '<div style="display:flex; gap:2px; margin-top:4px;">' + stars + '</div>' +
-             tagBadgesHtml + // Safe insertion of dynamic loop tags layout markup
+             tagBadgesHtml +
              (continu ? '<div style="background:rgba(0,0,0,0.5); border-radius:999px; height:4px; margin-top:6px; overflow:hidden;"><div style="background:#FFD700; width:' + pct + '%; height:100%;"></div></div>' : '') +
            '</div>' +
-         '</div>';
+          '</div>';
 
-        card.addEventListener('click', function() {
-          if (v.type === 'series') {
-            openSeries(v);
-          } else {
-            playVideo(v.url, v.title, v.category, v.tags);
-          }
+        card.addEventListener('click', () => {
+          if (v.type === 'series') openSeries(v);
+          else playVideo(v.url, v.title, v.category, v.tags);
         });
-
         grid.appendChild(card);
       });
-
       renderPagination(totalPages);
     }
 
@@ -529,54 +470,29 @@
       const bar = document.getElementById('paginationBar');
       bar.innerHTML = '';
       if (totalPages <= 1) return;
-
       function makeBtn(label, page, isActive, isDisabled) {
         const btn = document.createElement('button');
         btn.textContent = label;
-        btn.className = 'grid-btn' + (isActive ? ' active' : '');
-        btn.style.opacity = isDisabled ? '0.4' : '1';
+        btn.className   = 'grid-btn' + (isActive ? ' active' : '');
+        btn.style.opacity  = isDisabled ? '0.4' : '1';
         btn.style.minWidth = '36px';
-        if (!isDisabled) {
-          btn.addEventListener('click', function() {
-            currentPage = page;
-            window.scrollTo(0, 0);
-            renderVideos();
-          });
-        }
+        if (!isDisabled) btn.addEventListener('click', () => { currentPage = page; window.scrollTo(0,0); renderVideos(); });
         return btn;
       }
-
       bar.appendChild(makeBtn('‹', currentPage - 1, false, currentPage === 1));
-
       const maxButtons = 5;
       let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
       let endPage   = Math.min(totalPages, startPage + maxButtons - 1);
       if (endPage - startPage < maxButtons - 1) startPage = Math.max(1, endPage - maxButtons + 1);
-
       if (startPage > 1) {
         bar.appendChild(makeBtn('1', 1, currentPage === 1));
-        if (startPage > 2) {
-          const dots = document.createElement('span');
-          dots.textContent = '...';
-          dots.style.color = '#8B949E';
-          bar.appendChild(dots);
-        }
+        if (startPage > 2) { const d = document.createElement('span'); d.textContent = '...'; d.style.color = '#8B949E'; bar.appendChild(d); }
       }
-
-      for (let p = startPage; p <= endPage; p++) {
-        bar.appendChild(makeBtn(String(p), p, p === currentPage));
-      }
-
+      for (let p = startPage; p <= endPage; p++) bar.appendChild(makeBtn(String(p), p, p === currentPage));
       if (endPage < totalPages) {
-        if (endPage < totalPages - 1) {
-          const dots = document.createElement('span');
-          dots.textContent = '...';
-          dots.style.color = '#8B949E';
-          bar.appendChild(dots);
-        }
+        if (endPage < totalPages - 1) { const d = document.createElement('span'); d.textContent = '...'; d.style.color = '#8B949E'; bar.appendChild(d); }
         bar.appendChild(makeBtn(String(totalPages), totalPages, currentPage === totalPages));
       }
-
       bar.appendChild(makeBtn('›', currentPage + 1, false, currentPage === totalPages));
     }
 
@@ -590,50 +506,31 @@
     }
 
     async function rateVideo(videoUrl, star) {
-      const rRes      = await fetch('/api/ratings');
-      const ratings   = await rRes.json();
-      const myRating  = ratings.find(r => r.videoUrl === videoUrl && r.username === user.username);
-
-      // If tapping the same star, unrate it
+      const ratings  = await safeFetchJson('/api/ratings', []);
+      const myRating = ratings.find(r => r.videoUrl === videoUrl && r.username === user.username);
       if (myRating && myRating.rating === star) {
-        await authFetch('/api/unratevideo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: user.username, videoUrl: videoUrl })
-        });
+        await authFetch('/api/unratevideo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username, videoUrl }) });
       } else {
-        await authFetch('/api/ratevideo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: user.username, videoUrl: videoUrl, rating: star })
-        });
+        await authFetch('/api/ratevideo',   { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username, videoUrl, rating: star }) });
       }
-
-      // Refresh ratings data
-      const newRes = await fetch('/api/ratings');
-      allRatings   = await newRes.json();
-
-      // If a series page is currently open, refresh its rating display
+      allRatings = await safeFetchJson('/api/ratings', []);
       if (currentSeries && document.getElementById('seriesSection').style.display === 'block') {
-        const seriesRatingBox = document.getElementById('seriesRatingBox');
-        const videoRatings    = allRatings.filter(function(r) { return r.videoUrl === videoUrl; });
-        const avg             = videoRatings.length ? (videoRatings.reduce(function(a,b) { return a + b.rating; }, 0) / videoRatings.length).toFixed(1) : null;
-        const newMyRating     = allRatings.find(function(r) { return r.videoUrl === videoUrl && r.username === user.username; });
+        const videoRatings = allRatings.filter(r => r.videoUrl === videoUrl);
+        const avg          = videoRatings.length ? (videoRatings.reduce((a,b) => a + b.rating, 0) / videoRatings.length).toFixed(1) : null;
+        const newMy        = allRatings.find(r => r.videoUrl === videoUrl && r.username === user.username);
         let starsHtml = '';
         for (let s = 1; s <= 5; s++) {
-          const color = newMyRating && newMyRating.rating >= s ? '#FFD700' : '#30363D';
-          starsHtml += '<span onclick="rateVideo(\'' + videoUrl.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.4rem; color:' + color + ';">★</span>';
+          starsHtml += '<span onclick="rateVideo(\'' + videoUrl.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.4rem; color:' + (newMy && newMy.rating >= s ? '#FFD700' : '#30363D') + ';">★</span>';
         }
-        seriesRatingBox.innerHTML = '<div style="display:flex; align-items:center; gap:8px;">' + starsHtml + (avg ? '<span style="color:#8B949E; font-size:0.8rem;">' + avg + ' / 5</span>' : '') + '</div>';
+        document.getElementById('seriesRatingBox').innerHTML =
+          '<div style="display:flex; align-items:center; gap:8px;">' + starsHtml + (avg ? '<span style="color:#8B949E; font-size:0.8rem;">' + avg + ' / 5</span>' : '') + '</div>';
         renderRatedRows();
       } else if (document.getElementById('playerSection').style.display === 'block') {
-        // Regular video player is open — redraw just its star row in place
         const playerStarsBox = document.querySelector('#likeBar span[style*="margin-left:8px"]');
-        const newMyRating = allRatings.find(function(r) { return r.videoUrl === videoUrl && r.username === user.username; });
+        const newMy = allRatings.find(r => r.videoUrl === videoUrl && r.username === user.username);
         let starsHtml2 = '';
         for (let s = 1; s <= 5; s++) {
-          const color = newMyRating && newMyRating.rating >= s ? '#FFD700' : '#30363D';
-          starsHtml2 += '<span onclick="rateVideo(\'' + videoUrl.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + color + ';">★</span>';
+          starsHtml2 += '<span onclick="rateVideo(\'' + videoUrl.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + (newMy && newMy.rating >= s ? '#FFD700' : '#30363D') + ';">★</span>';
         }
         if (playerStarsBox) playerStarsBox.innerHTML = starsHtml2;
         renderRatedRows();
@@ -642,16 +539,6 @@
       }
     }
 
-    async function playVideo(url, title, category, tags) {
-      savedScrollY = window.scrollY;
-      const videoEl = document.getElementById('videoPlayer');
-      videoEl.src   = url;
-      // ===== MIUI-STYLE PLAYER =====
-    let _playerLocked   = false;
-    let _controlsTimer  = null;
-    let _speedOpts      = [1, 1.25, 1.5, 2, 0.5];
-    let _speedIdx       = 0;
-
     function formatTime(sec) {
       if (!isFinite(sec) || sec < 0) sec = 0;
       const m = Math.floor(sec / 60);
@@ -659,274 +546,270 @@
       return m + ':' + (s < 10 ? '0' : '') + s;
     }
 
-    function setupCustomPlayer() {
-      const v = document.getElementById('videoPlayer');
-      _playerLocked = false;
-      _speedIdx = 0;
-      v.playbackRate = 1;
-      document.getElementById('miuiSpeedBtn').textContent = '1.0x';
-      document.getElementById('miuiLockBtn').textContent = '🔓';
-      document.getElementById('miuiPlayIcon').textContent = '▶';
-      document.getElementById('miuiCurTime').textContent = '0:00';
-      document.getElementById('miuiDurTime').textContent = '0:00';
-      document.getElementById('miuiFill').style.width = '0%';
-      document.getElementById('miuiBuffer').style.width = '0%';
-      document.getElementById('miuiSeek').value = 0;
-      showPlayerControls();
-
-      v.onplay = function() {
-        document.getElementById('miuiPlayIcon').textContent = '⏸';
-        showPlayerControls();
-      };
-      v.onpause = function() {
-        document.getElementById('miuiPlayIcon').textContent = '▶';
-        clearTimeout(_controlsTimer);
-        showPlayerControls();
-      };
-      v.ontimeupdate = function() {
-        document.getElementById('miuiCurTime').textContent = formatTime(v.currentTime);
-        if (v.duration) {
-          const pct = (v.currentTime / v.duration) * 100;
-          document.getElementById('miuiSeek').value = pct;
-          document.getElementById('miuiFill').style.width = pct + '%';
-        }
-      };
-      v.onprogress = function() {
-        if (v.duration && v.buffered.length > 0) {
-          const pct = (v.buffered.end(v.buffered.length - 1) / v.duration) * 100;
-          document.getElementById('miuiBuffer').style.width = pct + '%';
-        }
-      };
-      v.onloadedmetadata = function() {
-        document.getElementById('miuiDurTime').textContent = formatTime(v.duration);
-        document.getElementById('miuiTitle').textContent =
-          document.getElementById('playerTitle').textContent;
-      };
-    }
-
-    function showPlayerControls() {
-      if (_playerLocked) return;
-      const c = document.getElementById('playerControls');
-      c.classList.remove('miui-hidden');
-      clearTimeout(_controlsTimer);
-      const v = document.getElementById('videoPlayer');
-      if (!v.paused) {
-        _controlsTimer = setTimeout(hidePlayerControls, 3500);
-      }
-    }
-
-    function hidePlayerControls() {
-      document.getElementById('playerControls').classList.add('miui-hidden');
-    }
-
-    function onPlayerTap() {
-      if (_playerLocked) return;
-      const c = document.getElementById('playerControls');
-      if (c.classList.contains('miui-hidden')) {
-        showPlayerControls();
-      } else {
-        hidePlayerControls();
-      }
-    }
-
-    function playerTogglePlay() {
+    function togglePlay() {
       const v = document.getElementById('videoPlayer');
       if (v.paused) { v.play(); } else { v.pause(); }
     }
 
-    function playerSkip(sec) {
+    function skip(amount) {
       const v = document.getElementById('videoPlayer');
-      v.currentTime = Math.min(Math.max(0, v.currentTime + sec), v.duration || 0);
-      showPlayerControls();
+      v.currentTime = Math.min(Math.max(0, v.currentTime + amount), v.duration || 0);
+      showControls();
     }
 
-    function playerSeek(val) {
+    function onSeek(value) {
       const v = document.getElementById('videoPlayer');
-      if (v.duration) v.currentTime = (val / 100) * v.duration;
+      if (v.duration) v.currentTime = (value / 100) * v.duration;
+      document.getElementById('miuiFill').style.width = value + '%';
+      showControls();
     }
 
-    function playerCycleSpeed() {
-      _speedIdx = (_speedIdx + 1) % _speedOpts.length;
+    function toggleMute() {
       const v = document.getElementById('videoPlayer');
-      v.playbackRate = _speedOpts[_speedIdx];
-      document.getElementById('miuiSpeedBtn').textContent = _speedOpts[_speedIdx] + 'x';
-      showPlayerControls();
+      v.muted = !v.muted;
+      document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
     }
 
-    function playerToggleLock() {
-      _playerLocked = !_playerLocked;
-      const btn = document.getElementById('miuiLockBtn');
-      const c   = document.getElementById('playerControls');
-      btn.textContent = _playerLocked ? '🔒' : '🔓';
-      if (_playerLocked) {
-        // hide everything except lock button
-        c.classList.add('miui-locked');
-        clearTimeout(_controlsTimer);
+    async function toggleOrientation() {
+      const wrap = document.getElementById('playerWrap');
+      const isLandscape = wrap.classList.contains('native-landscape') || wrap.classList.contains('fake-landscape');
+
+      if (isLandscape) {
+        if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) {} }
+        if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch (e) {} }
+        if (window.NativeBridge && window.NativeBridge.unlockOrientation) { try { window.NativeBridge.unlockOrientation(); } catch (e) {} }
+        wrap.classList.remove('native-landscape', 'fake-landscape');
+        return;
+      }
+
+      if (!document.fullscreenElement) {
+        try { await wrap.requestFullscreen(); } catch (e) {
+          // ignore, will still try to lock below
+        }
+      }
+
+      let locked = false;
+      if (screen.orientation && screen.orientation.lock) {
+        try {
+          await screen.orientation.lock('landscape');
+          locked = true;
+        } catch (e) {
+          // unsupported or blocked (e.g. iOS Safari) — fall back to the CSS rotate trick
+        }
+      }
+      if (window.NativeBridge && window.NativeBridge.lockOrientation) {
+        try { window.NativeBridge.lockOrientation(); locked = true; } catch (e) {}
+      }
+      wrap.classList.add(locked ? 'native-landscape' : 'fake-landscape');
+    }
+
+    function cycleSpeed() {
+      speedIndex = (speedIndex + 1) % speedOptions.length;
+      const v = document.getElementById('videoPlayer');
+      v.playbackRate = speedOptions[speedIndex];
+      document.getElementById('speedBtn').textContent = speedOptions[speedIndex] + 'x';
+      showControls();
+    }
+
+    function toggleLock() {
+      isLocked = !isLocked;
+      const controls = document.getElementById('customControls');
+      document.getElementById('miuiLockBtn').textContent = isLocked ? '🔒' : '🔓';
+      if (isLocked) {
+        clearTimeout(controlsHideTimer);
+        controls.classList.remove('miui-hidden');
+        controls.classList.add('miui-locked');
       } else {
-        c.classList.remove('miui-locked');
-        showPlayerControls();
+        controls.classList.remove('miui-locked');
+        showControls();
       }
     }
-    // ===== END MIUI-STYLE PLAYER =====
-      window._currentVideoUrl = url;
-      authFetch('/api/addview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl: url })
-      });
-      document.getElementById('playerTitle').textContent = title;
 
-      // Refresh likes data fresh for this video (guard against stale fetch)
-      const lRes = await fetch('/api/likes');
-      const freshLikes = await lRes.json();
-      if (window._currentVideoUrl !== url) return; // a newer playVideo call has taken over
+    function onPlayerTap(e) {
+      if (isLocked) return;
+      const controls = document.getElementById('customControls');
+      if (controls.classList.contains('miui-hidden')) {
+        showControls();
+      } else {
+        hideControlsNow();
+      }
+    }
+
+    function showControls() {
+      if (isLocked) return;
+      const controls = document.getElementById('customControls');
+      controls.classList.remove('miui-hidden');
+      clearTimeout(controlsHideTimer);
+      const v = document.getElementById('videoPlayer');
+      if (!v.paused) {
+        controlsHideTimer = setTimeout(hideControlsNow, 3000);
+      }
+    }
+
+    function hideControlsNow() {
+      if (isLocked) return;
+      document.getElementById('customControls').classList.add('miui-hidden');
+    }
+
+    function setupCustomPlayer() {
+      const v = document.getElementById('videoPlayer');
+      isLocked = false;
+      speedIndex = 0;
+      v.playbackRate = 1;
+      document.getElementById('miuiLockBtn').textContent = '🔓';
+      document.getElementById('speedBtn').textContent = '1.0x';
+      document.getElementById('centerPlayBtn').textContent = '▶️';
+      document.getElementById('miuiBuffer').style.width = '0%';
+      document.getElementById('miuiFill').style.width = '0%';
+      document.getElementById('seekBar').value = 0;
+      document.getElementById('curTime').textContent = '0:00';
+      document.getElementById('durTime').textContent = '0:00';
+      document.getElementById('miuiSpinner').style.display = 'none';
+      document.getElementById('customControls').classList.remove('miui-locked', 'miui-hidden');
+
+      v.onplay = function() {
+        document.getElementById('centerPlayBtn').textContent = '⏸️';
+        showControls();
+      };
+      v.onpause = function() {
+        document.getElementById('centerPlayBtn').textContent = '▶️';
+        clearTimeout(controlsHideTimer);
+      };
+      v.ontimeupdate = function() {
+        document.getElementById('curTime').textContent = formatTime(v.currentTime);
+        if (v.duration) {
+          const pct = (v.currentTime / v.duration) * 100;
+          document.getElementById('seekBar').value = pct;
+          document.getElementById('miuiFill').style.width = pct + '%';
+        }
+      };
+      v.onloadedmetadata = function() {
+        document.getElementById('durTime').textContent = formatTime(v.duration);
+      };
+      v.onvolumechange = function() {
+        document.getElementById('volIcon').textContent = v.muted || v.volume == 0 ? '🔇' : '🔊';
+      };
+      v.onprogress = function() {
+        if (v.buffered.length && v.duration) {
+          const end = v.buffered.end(v.buffered.length - 1);
+          document.getElementById('miuiBuffer').style.width = (end / v.duration * 100) + '%';
+        }
+      };
+      v.onwaiting = function() { document.getElementById('miuiSpinner').style.display = 'block'; };
+      v.onplaying = function() { document.getElementById('miuiSpinner').style.display = 'none'; };
+      v.oncanplay = function() { document.getElementById('miuiSpinner').style.display = 'none'; };
+    }
+
+    async function playVideo(url, title, category, tags) {
+      savedScrollY = window.scrollY;
+      const videoEl = document.getElementById('videoPlayer');
+      videoEl.src   = url;
+      document.getElementById('playerTitle').textContent = title;
+      document.getElementById('miuiTitle').textContent = title;
+      setupCustomPlayer();
+      window._currentVideoUrl = url;
+      videoEl.play().catch(function() {});
+
+      authFetch('/api/addview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ videoUrl: url }) });
+
+      const freshLikes = await safeFetchJson('/api/likes', []);
+      if (window._currentVideoUrl !== url) return;
       allLikes = freshLikes;
 
-      // Resume from last position
-      const prog = allProgress.find(function(p) { return p.videoUrl === url; });
+      const prog = allProgress.find(p => p.videoUrl === url);
       if (prog && !prog.watched && prog.current > 10) {
-        videoEl.addEventListener('loadedmetadata', function() {
-          videoEl.currentTime = prog.current;
-        }, { once: true });
+        videoEl.addEventListener('loadedmetadata', () => { videoEl.currentTime = prog.current; }, { once: true });
       }
 
-      // Save progress every 5 seconds
       if (window._progressTimer) clearInterval(window._progressTimer);
       window._progressTimer = setInterval(async function() {
         if (videoEl.duration && videoEl.currentTime > 0) {
           const isWatched = (videoEl.currentTime / videoEl.duration) >= 0.9;
-          await authFetch('/api/saveprogress', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              username: user.username,
-              videoUrl: url,
-              current:  videoEl.currentTime,
-              duration: videoEl.duration,
-              watched:  isWatched
-            })
-          });
-          if (isWatched) {
-            clearInterval(window._progressTimer);
-            loadVideos();
-          }
+          await authFetch('/api/saveprogress', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ username: user.username, videoUrl: url, current: videoEl.currentTime, duration: videoEl.duration, watched: isWatched }) });
+          if (isWatched) { clearInterval(window._progressTimer); loadVideos(); }
         }
       }, 5000);
 
       document.getElementById('playerSection').style.display = 'block';
-      document.getElementById('gridSection').style.display  = 'none';
-      document.getElementById('filterBar').style.display    = 'none';
+      document.getElementById('gridSection').style.display   = 'none';
+      document.getElementById('filterBar').style.display     = 'none';
 
-      // Show tags
       const tagsBox = document.getElementById('playerTags');
       tagsBox.innerHTML = '';
-      if (category) {
-        tagsBox.innerHTML += '<span style="background:#00D4FF; color:#000; border-radius:4px; padding:3px 8px; font-size:0.75rem; font-weight:700;">' + category + '</span>';
-      }
-      if (tags && tags.length) {
-        tags.forEach(t => {
-          tagsBox.innerHTML += '<span style="background:#1C2333; color:#8B949E; border:1px solid #30363D; border-radius:4px; padding:3px 8px; font-size:0.75rem;">#' + t + '</span>';
-        });
-      }
+      if (category) tagsBox.innerHTML += '<span style="background:#00D4FF; color:#000; border-radius:4px; padding:3px 8px; font-size:0.75rem; font-weight:700;">' + category + '</span>';
+      if (tags && tags.length) tags.forEach(t => {
+        tagsBox.innerHTML += '<span style="background:#1C2333; color:#8B949E; border:1px solid #30363D; border-radius:4px; padding:3px 8px; font-size:0.75rem;">#' + t + '</span>';
+      });
 
       window.scrollTo(0, 0);
-
-      // Show like dislike
-      const likeBar    = document.getElementById('likeBar');
-      const videoLikes = allLikes.filter(function(l) { return l.videoUrl === url; });
-      const likeCount  = videoLikes.filter(function(l) { return l.action === 'like'; }).length;
-      const disCount   = videoLikes.filter(function(l) { return l.action === 'dislike'; }).length;
-      const myLike     = allLikes.find(function(l) { return l.videoUrl === url && l.username === user.username; });
-
       renderLikeBar(url, url);
 
-      // Show related videos
-      const related  = document.getElementById('relatedVideos');
+      const related = document.getElementById('relatedVideos');
       related.innerHTML = '';
       const similar = allVideos.filter(v2 => v2.url !== url && v2.category === category);
       if (similar.length === 0) {
         related.innerHTML = '<p style="color:#8B949E; font-size:0.78rem; grid-column:1/-1;">No similar videos found.</p>';
       } else {
         similar.forEach(v2 => {
-          const thumbStyle = v2.thumb
-            ? 'background-image:url(' + v2.thumb + '); background-size:cover; background-position:center;'
-            : '';
+          const thumbStyle = v2.thumb ? 'background-image:url(' + v2.thumb + '); background-size:cover; background-position:center;' : '';
           const div = document.createElement('div');
           div.className = 'video-card';
-          div.innerHTML =
-            '<div class="thumbnail" style="' + thumbStyle + '">' +
-              '<div class="thumb-overlay">' +
-                '<div class="thumb-title">' + v2.title + '</div>' +
-              '</div>' +
-            '</div>';
-          div.addEventListener('click', function() {
-            playVideo(v2.url, v2.title, v2.category, v2.tags);
-          });
+          div.innerHTML = '<div class="thumbnail" style="' + thumbStyle + '"><div class="thumb-overlay"><div class="thumb-title">' + v2.title + '</div></div></div>';
+          div.addEventListener('click', () => playVideo(v2.url, v2.title, v2.category, v2.tags));
           related.appendChild(div);
         });
       }
       loadComments(url, 'commentList');
     }
 
-    let currentSeries   = null;
-    let currentEpIndex  = 0;
+    let currentSeries  = null;
+    let currentEpIndex = 0;
 
     function openSeries(v) {
       currentSeries  = v;
       currentEpIndex = 0;
-      savedScrollY = window.scrollY;
+      savedScrollY   = window.scrollY;
       window.scrollTo(0, 0);
       window._currentSeriesId = v.filename || v.title;
-      authFetch('/api/addview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl: window._currentSeriesId })
-      });
+      authFetch('/api/addview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ videoUrl: window._currentSeriesId }) });
+
       document.getElementById('gridSection').style.display   = 'none';
       document.getElementById('filterBar').style.display     = 'none';
       document.getElementById('seriesSection').style.display = 'block';
       document.getElementById('seriesTitle').textContent     = v.title;
 
-      // --- FIXED: Inject Series Category and Tag Badges ---
       const seriesTagsBox = document.getElementById('seriesTags');
       seriesTagsBox.innerHTML = '';
-      if (v.category) {
-        seriesTagsBox.innerHTML += '<span style="background:#00D4FF; color:#000; border-radius:4px; padding:3px 8px; font-size:0.75rem; font-weight:700;">' + v.category + '</span>';
-      }
-      if (v.tags && v.tags.length) {
-        v.tags.forEach(t => {
-          seriesTagsBox.innerHTML += '<span style="background:#1C2333; color:#8B949E; border:1px solid #30363D; border-radius:4px; padding:3px 8px; font-size:0.75rem;">#' + t + '</span>';
-        });
-      }
+      if (v.category) seriesTagsBox.innerHTML += '<span style="background:#00D4FF; color:#000; border-radius:4px; padding:3px 8px; font-size:0.75rem; font-weight:700;">' + v.category + '</span>';
+      if (v.tags && v.tags.length) v.tags.forEach(t => {
+        seriesTagsBox.innerHTML += '<span style="background:#1C2333; color:#8B949E; border:1px solid #30363D; border-radius:4px; padding:3px 8px; font-size:0.75rem;">#' + t + '</span>';
+      });
 
-      // Episodes
       const epList = document.getElementById('seriesEpisodes');
       epList.innerHTML = '';
       v.episodes.forEach(function(ep, idx) {
         const div = document.createElement('div');
         div.style.cssText = 'background:#1C2333; border:1px solid #30363D; border-radius:10px; padding:12px 16px; margin-bottom:10px; cursor:pointer; display:flex; align-items:center; gap:12px;';
-        div.innerHTML = '<div style="width:32px; height:32px; background:#00D4FF; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#000; font-weight:700; flex-shrink:0;">' + (idx+1) + '</div>' +
+        div.innerHTML =
+          '<div style="width:32px; height:32px; background:#00D4FF; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#000; font-weight:700; flex-shrink:0;">' + (idx+1) + '</div>' +
           '<div><div style="font-size:0.88rem; font-weight:600;">' + ep.title + '</div></div>';
-        div.addEventListener('click', function() { playEpisode(idx); });
+        div.addEventListener('click', () => playEpisode(idx));
         epList.appendChild(div);
       });
 
-      // More like this
       const moreBox = document.getElementById('seriesMore');
       moreBox.innerHTML = '';
-      const similar = allVideos.filter(function(v2) { return v2.title !== v.title && v2.category === v.category; });
+      const similar = allVideos.filter(v2 => v2.title !== v.title && v2.category === v.category);
       if (similar.length === 0) {
         moreBox.innerHTML = '<p style="color:#8B949E; font-size:0.78rem; grid-column:1/-1;">No similar videos found.</p>';
       } else {
-        similar.forEach(function(v2) {
+        similar.forEach(v2 => {
           const thumbStyle = v2.thumb ? 'background-image:url(' + v2.thumb + '); background-size:cover; background-position:center;' : '';
           const div = document.createElement('div');
           div.className = 'video-card';
           div.innerHTML = '<div class="thumbnail" style="' + thumbStyle + '"><div class="thumb-overlay"><div class="thumb-title">' + v2.title + '</div></div></div>';
-          div.addEventListener('click', function() {
-            if (v2.type === 'series') openSeries(v2);
-            else playVideo(v2.url, v2.title, v2.category, v2.tags);
-          });
+          div.addEventListener('click', () => { if (v2.type === 'series') openSeries(v2); else playVideo(v2.url, v2.title, v2.category, v2.tags); });
           moreBox.appendChild(div);
         });
       }
@@ -937,163 +820,29 @@
       currentEpIndex = idx;
       const ep = currentSeries.episodes[idx];
       window._currentVideoUrl = ep.url;
+
       document.getElementById('likeBar').innerHTML = '';
-      document.getElementById('seriesSection').style.display  = 'none';
-      document.getElementById('playerSection').style.display  = 'block';
-      document.getElementById('videoPlayer').src              = ep.url;
-      // ===== MIUI-STYLE PLAYER =====
-    let _playerLocked   = false;
-    let _controlsTimer  = null;
-    let _speedOpts      = [1, 1.25, 1.5, 2, 0.5];
-    let _speedIdx       = 0;
+      document.getElementById('seriesSection').style.display = 'none';
+      document.getElementById('playerSection').style.display = 'block';
+      const videoEl = document.getElementById('videoPlayer');
+      videoEl.src   = ep.url;
+      document.getElementById('playerTitle').textContent = currentSeries.title + ' — ' + ep.title;
+      document.getElementById('miuiTitle').textContent = currentSeries.title + ' — ' + ep.title;
+      setupCustomPlayer();
+      videoEl.play().catch(function() {});
 
-    function formatTime(sec) {
-      if (!isFinite(sec) || sec < 0) sec = 0;
-      const m = Math.floor(sec / 60);
-      const s = Math.floor(sec % 60);
-      return m + ':' + (s < 10 ? '0' : '') + s;
-    }
+      allLikes = await safeFetchJson('/api/likes', []);
 
-    function setupCustomPlayer() {
-      const v = document.getElementById('videoPlayer');
-      _playerLocked = false;
-      _speedIdx = 0;
-      v.playbackRate = 1;
-      document.getElementById('miuiSpeedBtn').textContent = '1.0x';
-      document.getElementById('miuiLockBtn').textContent = '🔓';
-      document.getElementById('miuiPlayIcon').textContent = '▶';
-      document.getElementById('miuiCurTime').textContent = '0:00';
-      document.getElementById('miuiDurTime').textContent = '0:00';
-      document.getElementById('miuiFill').style.width = '0%';
-      document.getElementById('miuiBuffer').style.width = '0%';
-      document.getElementById('miuiSeek').value = 0;
-      showPlayerControls();
-
-      v.onplay = function() {
-        document.getElementById('miuiPlayIcon').textContent = '⏸';
-        showPlayerControls();
-      };
-      v.onpause = function() {
-        document.getElementById('miuiPlayIcon').textContent = '▶';
-        clearTimeout(_controlsTimer);
-        showPlayerControls();
-      };
-      v.ontimeupdate = function() {
-        document.getElementById('miuiCurTime').textContent = formatTime(v.currentTime);
-        if (v.duration) {
-          const pct = (v.currentTime / v.duration) * 100;
-          document.getElementById('miuiSeek').value = pct;
-          document.getElementById('miuiFill').style.width = pct + '%';
-        }
-      };
-      v.onprogress = function() {
-        if (v.duration && v.buffered.length > 0) {
-          const pct = (v.buffered.end(v.buffered.length - 1) / v.duration) * 100;
-          document.getElementById('miuiBuffer').style.width = pct + '%';
-        }
-      };
-      v.onloadedmetadata = function() {
-        document.getElementById('miuiDurTime').textContent = formatTime(v.duration);
-        document.getElementById('miuiTitle').textContent =
-          document.getElementById('playerTitle').textContent;
-      };
-    }
-
-    function showPlayerControls() {
-      if (_playerLocked) return;
-      const c = document.getElementById('playerControls');
-      c.classList.remove('miui-hidden');
-      clearTimeout(_controlsTimer);
-      const v = document.getElementById('videoPlayer');
-      if (!v.paused) {
-        _controlsTimer = setTimeout(hidePlayerControls, 3500);
-      }
-    }
-
-    function hidePlayerControls() {
-      document.getElementById('playerControls').classList.add('miui-hidden');
-    }
-
-    function onPlayerTap() {
-      if (_playerLocked) return;
-      const c = document.getElementById('playerControls');
-      if (c.classList.contains('miui-hidden')) {
-        showPlayerControls();
-      } else {
-        hidePlayerControls();
-      }
-    }
-
-    function playerTogglePlay() {
-      const v = document.getElementById('videoPlayer');
-      if (v.paused) { v.play(); } else { v.pause(); }
-    }
-
-    function playerSkip(sec) {
-      const v = document.getElementById('videoPlayer');
-      v.currentTime = Math.min(Math.max(0, v.currentTime + sec), v.duration || 0);
-      showPlayerControls();
-    }
-
-    function playerSeek(val) {
-      const v = document.getElementById('videoPlayer');
-      if (v.duration) v.currentTime = (val / 100) * v.duration;
-    }
-
-    function playerCycleSpeed() {
-      _speedIdx = (_speedIdx + 1) % _speedOpts.length;
-      const v = document.getElementById('videoPlayer');
-      v.playbackRate = _speedOpts[_speedIdx];
-      document.getElementById('miuiSpeedBtn').textContent = _speedOpts[_speedIdx] + 'x';
-      showPlayerControls();
-    }
-
-    function playerToggleLock() {
-      _playerLocked = !_playerLocked;
-      const btn = document.getElementById('miuiLockBtn');
-      const c   = document.getElementById('playerControls');
-      btn.textContent = _playerLocked ? '🔒' : '🔓';
-      if (_playerLocked) {
-        // hide everything except lock button
-        c.classList.add('miui-locked');
-        clearTimeout(_controlsTimer);
-      } else {
-        c.classList.remove('miui-locked');
-        showPlayerControls();
-      }
-    }
-    // ===== END MIUI-STYLE PLAYER =====
-      document.getElementById('playerTitle').textContent      = currentSeries.title + ' — ' + ep.title;
-
-      // Refresh likes fresh for this episode
-      const lRes = await fetch('/api/likes');
-      allLikes   = await lRes.json();
-
-      // === FIX: Clear old tags and inject current series tags dynamically ===
       const tagsBox = document.getElementById('playerTags');
-      tagsBox.innerHTML = ''; // Wipes out whatever video tags were loaded before
-
-      if (currentSeries.category) {
-        tagsBox.innerHTML += '<span style="background:#00D4FF; color:#000; border-radius:4px; padding:3px 8px; font-size:0.75rem; font-weight:700;">' + currentSeries.category + '</span>';
-      }
-      if (currentSeries.tags && currentSeries.tags.length) {
-        currentSeries.tags.forEach(t => {
-          tagsBox.innerHTML += '<span style="background:#1C2333; color:#8B949E; border:1px solid #30363D; border-radius:4px; padding:3px 8px; font-size:0.75rem;">#' + t + '</span>';
-        });
-      }
-      // ======================================================================
-
-      // Show like dislike for this episode
-      const likeBar2    = document.getElementById('likeBar');
-      const videoLikes2 = allLikes.filter(function(l) { return l.videoUrl === ep.url; });
-      const likeCount2  = videoLikes2.filter(function(l) { return l.action === 'like'; }).length;
-      const disCount2   = videoLikes2.filter(function(l) { return l.action === 'dislike'; }).length;
-      const myLike2     = allLikes.find(function(l) { return l.videoUrl === ep.url && l.username === user.username; });
+      tagsBox.innerHTML = '';
+      if (currentSeries.category) tagsBox.innerHTML += '<span style="background:#00D4FF; color:#000; border-radius:4px; padding:3px 8px; font-size:0.75rem; font-weight:700;">' + currentSeries.category + '</span>';
+      if (currentSeries.tags && currentSeries.tags.length) currentSeries.tags.forEach(t => {
+        tagsBox.innerHTML += '<span style="background:#1C2333; color:#8B949E; border:1px solid #30363D; border-radius:4px; padding:3px 8px; font-size:0.75rem;">#' + t + '</span>';
+      });
 
       const seriesId = currentSeries.filename || currentSeries.title;
       renderLikeBar(ep.url, seriesId);
 
-      // Show episode list below player
       const epSection = document.getElementById('episodeSection');
       const epList    = document.getElementById('episodeList');
       epSection.style.display = 'block';
@@ -1101,22 +850,18 @@
       currentSeries.episodes.forEach(function(e, i) {
         const div = document.createElement('div');
         div.style.cssText = 'background:' + (i === idx ? '#003a4a' : '#1C2333') + '; border:1px solid ' + (i === idx ? '#00D4FF' : '#30363D') + '; border-radius:8px; padding:10px 14px; margin-bottom:8px; cursor:pointer; display:flex; align-items:center; gap:10px;';
-        div.innerHTML = '<div style="width:26px; height:26px; background:' + (i === idx ? '#00D4FF' : '#30363D') + '; border-radius:50%; display:flex; align-items:center; justify-content:center; color:' + (i === idx ? '#000' : '#fff') + '; font-size:0.72rem; font-weight:700; flex-shrink:0;">' + (i+1) + '</div>' +
+        div.innerHTML =
+          '<div style="width:26px; height:26px; background:' + (i === idx ? '#00D4FF' : '#30363D') + '; border-radius:50%; display:flex; align-items:center; justify-content:center; color:' + (i === idx ? '#000' : '#fff') + '; font-size:0.72rem; font-weight:700; flex-shrink:0;">' + (i+1) + '</div>' +
           '<span style="font-size:0.82rem;">' + e.title + '</span>';
-        div.addEventListener('click', function() { playEpisode(i); });
+        div.addEventListener('click', () => playEpisode(i));
         epList.appendChild(div);
       });
 
-      // Auto play next episode when ended
-      const videoEl = document.getElementById('videoPlayer');
       videoEl.onended = function() {
-        if (currentEpIndex < currentSeries.episodes.length - 1) {
-          playEpisode(currentEpIndex + 1);
-        }
+        if (currentEpIndex < currentSeries.episodes.length - 1) playEpisode(currentEpIndex + 1);
       };
 
       loadComments(ep.url, 'commentList');
-      videoEl.play();
       window.scrollTo(0, 0);
     }
 
@@ -1131,16 +876,12 @@
     }
 
     function goBack() {
-      // Always unlock orientation when leaving the player
-      if (window.NativeBridge) {
-        window.NativeBridge.unlockOrientation();
-      }
-
+      if (document.fullscreenElement) { document.exitFullscreen().catch(function() {}); }
+      if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch (e) {} }
+      if (window.NativeBridge) window.NativeBridge.unlockOrientation();
       const wrap = document.getElementById('playerWrap');
       wrap.classList.remove('fake-landscape');
       wrap.classList.remove('native-landscape');
-      const orientBtn = document.getElementById('orientBtn');
-      if (orientBtn) orientBtn.textContent = '🔄';
       const bottomNav = document.getElementById('bottomNav');
       if (bottomNav) bottomNav.style.display = '';
 
@@ -1155,19 +896,16 @@
 
       document.getElementById('playerSection').style.display  = 'none';
       document.getElementById('seriesSection').style.display  = 'none';
-      document.getElementById('seriesSection').style.display  = 'none';
       document.getElementById('episodeSection').style.display = 'none';
       document.getElementById('gridSection').style.display    = 'block';
       document.getElementById('filterBar').style.display      = 'flex';
       currentSeries  = null;
       currentEpIndex = 0;
-      setTimeout(function() {
-        window.scrollTo(0, savedScrollY);
-      }, 10);
+      setTimeout(() => window.scrollTo(0, savedScrollY), 10);
     }
 
     function logout() {
-      authFetch('/api/logout', { method: 'POST' }).catch(function() {});
+      authFetch('/api/logout', { method: 'POST' }).catch(() => {});
       localStorage.removeItem('user');
       localStorage.removeItem('token');
       window.location.href = '/login.html';
@@ -1175,54 +913,29 @@
 
     async function pingOnline() {
       if (!user || !user.username) return;
-      await authFetch('/api/ping', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.username })
-      });
+      await authFetch('/api/ping', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username }) });
     }
     pingOnline();
     setInterval(pingOnline, 30000);
 
     function setGrid(size) {
       const grid = document.getElementById('videoGrid');
-      if (grid) {
-        grid.className = 'video-grid grid-' + size;
-        localStorage.setItem('gridSize', size);
-      }
+      if (grid) { grid.className = 'video-grid grid-' + size; localStorage.setItem('gridSize', size); }
     }
-
-    // Restore saved grid preference
-    const savedGrid = localStorage.getItem('gridSize') || '2';
-    setGrid(savedGrid);
+    setGrid(localStorage.getItem('gridSize') || '2');
 
     function checkAgeGate() {
-      hideMenu();
-      closeMorePanel();
+      hideMenu(); closeMorePanel();
       document.getElementById('ageGateOverlay').style.display = 'flex';
     }
 
     function confirmAge(isAdult) {
       document.getElementById('ageGateOverlay').style.display = 'none';
-      if (isAdult) {
-        sessionStorage.setItem('ageVerified', 'true');
-        window.location.href = '/adult.html';
-      }
-      // If "No", just close the modal, nothing else happens
+      if (isAdult) { sessionStorage.setItem('ageVerified', 'true'); window.location.href = '/adult.html'; }
     }
 
-    function goHome() {
-      setCategory('All');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setActiveBnav('bnav-home');
-    }
-
-    function goFavourites() {
-      setCategory('Favorites');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setActiveBnav('bnav-fav');
-    }
-
+    function goHome() { setCategory('All'); window.scrollTo({ top:0, behavior:'smooth' }); setActiveBnav('bnav-home'); }
+    function goFavourites() { setCategory('Favorites'); window.scrollTo({ top:0, behavior:'smooth' }); setActiveBnav('bnav-fav'); }
     function setActiveBnav(id) {
       document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('active'));
       const el = document.getElementById(id);
@@ -1233,16 +946,11 @@
       document.getElementById('morePanel').classList.toggle('open');
       document.getElementById('moreOverlay').classList.toggle('open');
     }
-
     function closeMorePanel() {
       document.getElementById('morePanel').classList.remove('open');
       document.getElementById('moreOverlay').classList.remove('open');
     }
-
-    function hideMenu() {
-      document.getElementById('gridSubMenu').style.display = 'none';
-    }
-
+    function hideMenu() { document.getElementById('gridSubMenu').style.display = 'none'; }
     function toggleGridMenu() {
       const sub = document.getElementById('gridSubMenu');
       sub.style.display = sub.style.display === 'none' ? 'block' : 'none';
@@ -1264,31 +972,12 @@
       }
       window._videos = filtered;
       filtered.forEach(function(v) {
-        const videoUrl     = v.url || '';
-        const videoRatings = allRatings.filter(function(r) { return r.videoUrl === videoUrl; });
-        const avg = videoRatings.length
-          ? (videoRatings.reduce(function(a,b) { return a + b.rating; }, 0) / videoRatings.length).toFixed(1)
-          : null;
-        const myRating  = allRatings.find(function(r) { return r.videoUrl === videoUrl && r.username === user.username; });
-        const prog      = allProgress.find(function(p) { return p.videoUrl === videoUrl; });
-        const watched   = prog && prog.watched;
-        const continu   = prog && !prog.watched && prog.current > 0;
-        const pct       = prog && prog.duration > 0 ? (prog.current / prog.duration * 100).toFixed(0) : 0;
-        const isFav     = allFavorites.includes(videoUrl);
-
-        let stars = '';
-        if (v.type !== 'series') {
-          for (let s = 1; s <= 5; s++) {
-            const color   = myRating && myRating.rating >= s ? '#FFD700' : '#30363D';
-            const safeUrl = videoUrl.replace(/'/g, "\\'");
-            stars += '<span onclick="event.stopPropagation(); rateVideo(\'' + safeUrl + '\',' + s + ')" style="cursor:pointer; font-size:1rem; color:' + color + ';">★</span>';
-          }
-        }
-
-        const thumbStyle = v.thumb
-          ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;'
-          : '';
-
+        const videoUrl = v.url || '';
+        const prog     = allProgress.find(p => p.videoUrl === videoUrl);
+        const watched  = prog && prog.watched;
+        const continu  = prog && !prog.watched && prog.current > 0;
+        const pct      = prog && prog.duration > 0 ? (prog.current / prog.duration * 100).toFixed(0) : 0;
+        const thumbStyle = v.thumb ? 'background-image:url(' + v.thumb + '); background-size:cover; background-position:center;' : '';
         const card = document.createElement('div');
         card.className = 'video-card';
         card.innerHTML =
@@ -1296,78 +985,47 @@
             (watched ? '<div class="thumb-badge" style="background:#00dd66; color:#000;">✓ Watched</div>' :
              continu ? '<div class="thumb-badge" style="background:#FFD700; color:#000;">▶ Continue</div>' :
              v.type === 'series' ? '<div class="thumb-badge">📺 ' + (v.episodes ? v.episodes.length : 0) + ' eps</div>' :
-             avg ? '<div class="thumb-badge">★ ' + avg + '</div>' : '<div class="thumb-badge">▶</div>') +
+             '<div class="thumb-badge">▶</div>') +
             (v.category ? '<div class="thumb-category">' + v.category + '</div>' : '') +
             '<div class="thumb-overlay">' +
               '<div class="thumb-title">' + v.title + '</div>' +
-              (v.type !== 'series' ? '<div style="display:flex; gap:2px; margin-top:4px;">' + stars + '</div>' : '') +
               (continu ? '<div style="background:rgba(0,0,0,0.5); border-radius:999px; height:4px; margin-top:6px; overflow:hidden;"><div style="background:#00D4FF; height:100%; width:' + pct + '%;"></div></div>' : '') +
             '</div>' +
           '</div>';
-
-        card.addEventListener('click', function() {
-          if (v.type === 'series') openSeries(v);
-          else playVideo(v.url, v.title, v.category, v.tags);
-        });
+        card.addEventListener('click', () => { if (v.type === 'series') openSeries(v); else playVideo(v.url, v.title, v.category, v.tags); });
         grid.appendChild(card);
       });
     }
 
-    function clearSearch() {
-      document.getElementById('searchInput').value = '';
-      renderVideos();
-    }
+    function clearSearch() { document.getElementById('searchInput').value = ''; renderVideos(); }
 
     async function toggleFav(videoUrl) {
-      const res  = await authFetch('/api/togglefavorite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.username, videoUrl })
-      });
+      const res  = await authFetch('/api/togglefavorite', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username, videoUrl }) });
       const data = await res.json();
-
-      // Update local cache immediately
-      if (data.favorited) {
-        if (!allFavorites.includes(videoUrl)) allFavorites.push(videoUrl);
-      } else {
-        allFavorites = allFavorites.filter(function(u) { return u !== videoUrl; });
-      }
-
-      // If the player or series page is open, re-render the whole bar so heart, stars, and like/dislike stay in sync
+      if (data.favorited) { if (!allFavorites.includes(videoUrl)) allFavorites.push(videoUrl); }
+      else { allFavorites = allFavorites.filter(u => u !== videoUrl); }
       const playerOpen = document.getElementById('playerSection').style.display === 'block';
       const seriesOpen = document.getElementById('seriesSection').style.display === 'block';
-      if (playerOpen && window._currentVideoUrl) {
-        renderLikeBar(window._currentVideoUrl, window._currentVideoUrl);
-      } else if (seriesOpen && window._currentVideoUrl && window._currentSeriesId) {
-        renderLikeBar(window._currentVideoUrl, window._currentSeriesId);
-      }
-
-      if (!playerOpen && !seriesOpen) {
-        loadVideos();
-      } else {
-        renderRatedRows();
-      }
+      if (playerOpen && window._currentVideoUrl) renderLikeBar(window._currentVideoUrl, window._currentVideoUrl);
+      else if (seriesOpen && window._currentVideoUrl && window._currentSeriesId) renderLikeBar(window._currentVideoUrl, window._currentSeriesId);
+      if (!playerOpen && !seriesOpen) loadVideos(); else renderRatedRows();
     }
 
     let currentLikeBarFavId = null;
 
     function renderLikeBar(videoUrl, favId) {
       currentLikeBarFavId = favId;
-      const likeBar     = document.getElementById('likeBar');
-      const videoLikes  = allLikes.filter(function(l) { return l.videoUrl === videoUrl; });
-      const likeCount   = videoLikes.filter(function(l) { return l.action === 'like'; }).length;
-      const disCount    = videoLikes.filter(function(l) { return l.action === 'dislike'; }).length;
-      const myLike      = allLikes.find(function(l) { return l.videoUrl === videoUrl && l.username === user.username; });
-
-      const myRatingNow = allRatings.find(function(r) { return r.videoUrl === favId && r.username === user.username; });
-      const isFavNow     = allFavorites.includes(favId);
-
+      const likeBar    = document.getElementById('likeBar');
+      const videoLikes = allLikes.filter(l => l.videoUrl === videoUrl);
+      const likeCount  = videoLikes.filter(l => l.action === 'like').length;
+      const disCount   = videoLikes.filter(l => l.action === 'dislike').length;
+      const myLike     = allLikes.find(l => l.videoUrl === videoUrl && l.username === user.username);
+      const myRatingNow = allRatings.find(r => r.videoUrl === favId && r.username === user.username);
+      const isFavNow    = allFavorites.includes(favId);
       let starsHtml = '';
       for (let s = 1; s <= 5; s++) {
-        const color = myRatingNow && myRatingNow.rating >= s ? '#FFD700' : '#30363D';
-        starsHtml += '<span onclick="rateVideo(\'' + favId.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + color + ';">★</span>';
+        starsHtml += '<span onclick="rateVideo(\'' + favId.replace(/'/g,"\\'") + '\',' + s + ')" style="cursor:pointer; font-size:1.3rem; color:' + (myRatingNow && myRatingNow.rating >= s ? '#FFD700' : '#30363D') + ';">★</span>';
       }
-
       likeBar.innerHTML =
         '<button onclick="toggleLike(\'' + videoUrl.replace(/'/g,"\\'") + '\',\'like\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'like' ? '#00D4FF' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'like' ? '#00D4FF' : '#30363D') + '; color:' + (myLike && myLike.action === 'like' ? '#000' : '#fff') + '; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👍 ' + likeCount + '</button>' +
         '<button onclick="toggleLike(\'' + videoUrl.replace(/'/g,"\\'") + '\',\'dislike\')" style="display:flex; align-items:center; gap:6px; background:' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#1C2333') + '; border:1px solid ' + (myLike && myLike.action === 'dislike' ? '#ff4444' : '#30363D') + '; color:#fff; border-radius:999px; padding:8px 16px; font-size:0.85rem; cursor:pointer; width:auto;">👎 ' + disCount + '</button>' +
@@ -1376,35 +1034,26 @@
     }
 
     async function toggleLike(videoUrl, action) {
-      await authFetch('/api/togglelike', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.username, videoUrl, action })
-      });
-      const lRes = await fetch('/api/likes');
-      allLikes   = await lRes.json();
+      await authFetch('/api/togglelike', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username, videoUrl, action }) });
+      allLikes = await safeFetchJson('/api/likes', []);
       renderLikeBar(videoUrl, currentLikeBarFavId || videoUrl);
     }
 
     function renderRatedRows() {
       const ratedVideos = allVideos.filter(function(v) {
         const id = v.type === 'series' ? (v.filename || v.title) : (v.url || '');
-        const videoRatings = allRatings.filter(function(r) { return r.videoUrl === id; });
-        return videoRatings.length > 0;
+        return allRatings.filter(r => r.videoUrl === id).length > 0;
       }).map(function(v) {
         const id = v.type === 'series' ? (v.filename || v.title) : (v.url || '');
-        const videoRatings = allRatings.filter(function(r) { return r.videoUrl === id; });
-        const avg = videoRatings.reduce(function(a,b) { return a + b.rating; }, 0) / videoRatings.length;
+        const videoRatings = allRatings.filter(r => r.videoUrl === id);
+        const avg = videoRatings.reduce((a,b) => a + b.rating, 0) / videoRatings.length;
         return { v, avg };
       });
-
-      const topRated   = ratedVideos.filter(function(item) { return item.avg >= 3; }).sort(function(a,b) { return b.avg - a.avg; }).slice(0, 5);
-      const leastRated = ratedVideos.filter(function(item) { return item.avg <= 2; }).sort(function(a,b) { return a.avg - b.avg; }).slice(0, 5);
+      const topRated   = ratedVideos.filter(i => i.avg >= 3).sort((a,b) => b.avg - a.avg).slice(0, 5);
+      const leastRated = ratedVideos.filter(i => i.avg <= 2).sort((a,b) => a.avg - b.avg).slice(0, 5);
 
       function buildSmallCard(item) {
-        const thumbStyle = item.v.thumb
-          ? 'background-image:url(' + item.v.thumb + '); background-size:cover; background-position:center;'
-          : '';
+        const thumbStyle = item.v.thumb ? 'background-image:url(' + item.v.thumb + '); background-size:cover; background-position:center;' : '';
         const div = document.createElement('div');
         div.style.cssText = 'flex-shrink:0; width:100px; cursor:pointer;';
         div.innerHTML =
@@ -1414,29 +1063,14 @@
               '<div style="color:#fff; font-size:0.6rem; font-weight:600; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">' + item.v.title + '</div>' +
             '</div>' +
           '</div>';
-        div.addEventListener('click', function() {
-          if (item.v.type === 'series') openSeries(item.v);
-          else playVideo(item.v.url, item.v.title, item.v.category, item.v.tags);
-        });
+        div.addEventListener('click', () => { if (item.v.type === 'series') openSeries(item.v); else playVideo(item.v.url, item.v.title, item.v.category, item.v.tags); });
         return div;
       }
 
       const topRow   = document.getElementById('topRatedRow');
       const leastRow = document.getElementById('leastRatedRow');
-      topRow.innerHTML   = '';
-      leastRow.innerHTML = '';
-
-      if (topRated.length === 0) {
-        topRow.innerHTML = '<p style="color:#8B949E; font-size:0.78rem;">No videos rated 3 stars or above.</p>';
-      } else {
-        topRated.forEach(function(item) { topRow.appendChild(buildSmallCard(item)); });
-      }
-
-      if (leastRated.length === 0) {
-        leastRow.innerHTML = '<p style="color:#8B949E; font-size:0.78rem;">No videos rated below 2 stars.</p>';
-      } else {
-        leastRated.forEach(function(item) { leastRow.appendChild(buildSmallCard(item)); });
-      }
+      if (topRow)   { topRow.innerHTML   = ''; topRated.length   ? topRated.forEach(i => topRow.appendChild(buildSmallCard(i)))     : topRow.innerHTML   = '<p style="color:#8B949E; font-size:0.78rem;">No videos rated 3 stars or above.</p>'; }
+      if (leastRow) { leastRow.innerHTML = ''; leastRated.length ? leastRated.forEach(i => leastRow.appendChild(buildSmallCard(i))) : leastRow.innerHTML = '<p style="color:#8B949E; font-size:0.78rem;">No videos rated below 2 stars.</p>'; }
     }
 
     function buildCommentRow(c, listElId) {
@@ -1446,10 +1080,7 @@
       div.innerHTML =
         '<div style="width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,#00D4FF,#0077ff); display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0;">' + (c.avatar || '😀') + '</div>' +
         '<div style="flex:1;">' +
-          '<div style="display:flex; align-items:center; gap:8px;">' +
-            '<span style="font-size:0.82rem; font-weight:700;">' + c.username + '</span>' +
-            '<span style="font-size:0.68rem; color:#8B949E;">' + c.time + '</span>' +
-          '</div>' +
+          '<div style="display:flex; align-items:center; gap:8px;"><span style="font-size:0.82rem; font-weight:700;">' + c.username + '</span><span style="font-size:0.68rem; color:#8B949E;">' + c.time + '</span></div>' +
           '<div style="font-size:0.82rem; margin-top:2px;">' + c.text + '</div>' +
           (isMine ? '<button onclick="deleteComment(\'' + c.id + '\',\'' + listElId + '\')" style="background:none; border:none; color:#ff6666; font-size:0.7rem; cursor:pointer; padding:0; margin-top:4px; width:auto;">🗑 Delete</button>' : '') +
         '</div>';
@@ -1457,28 +1088,18 @@
     }
 
     async function loadComments(videoUrl, listElId) {
-      const res      = await fetch('/api/comments?videoUrl=' + encodeURIComponent(videoUrl));
-      const comments = await res.json();
-      const list     = document.getElementById(listElId);
+      const comments = await safeFetchJson('/api/comments?videoUrl=' + encodeURIComponent(videoUrl), []);
+      const list = document.getElementById(listElId);
       list.innerHTML = '';
-      if (comments.length === 0) {
-        list.innerHTML = '<p style="color:#8B949E; font-size:0.8rem;">No comments yet. Be the first!</p>';
-        return;
-      }
-      comments.forEach(function(c) {
-        list.appendChild(buildCommentRow(c, listElId));
-      });
+      if (comments.length === 0) { list.innerHTML = '<p style="color:#8B949E; font-size:0.8rem;">No comments yet. Be the first!</p>'; return; }
+      comments.forEach(c => list.appendChild(buildCommentRow(c, listElId)));
     }
 
     async function postComment() {
       const input = document.getElementById('commentInput');
       const text  = input.value.trim();
       if (!text) return;
-      await authFetch('/api/addcomment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl: window._currentVideoUrl, username: user.username, avatar: user.avatar, text })
-      });
+      await authFetch('/api/addcomment', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ videoUrl: window._currentVideoUrl, username: user.username, avatar: user.avatar, text }) });
       input.value = '';
       loadComments(window._currentVideoUrl, 'commentList');
     }
@@ -1487,27 +1108,18 @@
       const input = document.getElementById('seriesCommentInput');
       const text  = input.value.trim();
       if (!text) return;
-      await authFetch('/api/addcomment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl: window._currentSeriesId, username: user.username, avatar: user.avatar, text })
-      });
+      await authFetch('/api/addcomment', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ videoUrl: window._currentSeriesId, username: user.username, avatar: user.avatar, text }) });
       input.value = '';
       loadComments(window._currentSeriesId, 'seriesCommentList');
     }
 
     async function deleteComment(id, listElId) {
       if (!confirm('Delete this comment?')) return;
-      await authFetch('/api/deletecomment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-      });
+      await authFetch('/api/deletecomment', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
       const videoUrl = listElId === 'commentList' ? window._currentVideoUrl : window._currentSeriesId;
       loadComments(videoUrl, listElId);
     }
 
-    // Initialize Capacitor plugins on startup
     document.addEventListener('deviceready', async function() {
       if (isCapacitorApp()) {
         try {
@@ -1520,25 +1132,16 @@
 
     loadVideos().then(function() {
       renderContinueWatching();
-
       const splash = document.getElementById('splashScreen');
-      if (splash) {
-        splash.style.opacity = '0';
-        setTimeout(function() { splash.remove(); }, 400);
-      }
-
-      const urlParams = new URLSearchParams(window.location.search);
-      const catParam = urlParams.get('cat');
-      if (catParam) {
-        setCategory(catParam);
-      }
-
+      if (splash) { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 400); }
+      const catParam = new URLSearchParams(window.location.search).get('cat');
+      if (catParam) setCategory(catParam);
       const jump = sessionStorage.getItem('jumpToVideo');
       if (jump) {
         sessionStorage.removeItem('jumpToVideo');
         const v = JSON.parse(jump);
         if (v.type === 'series') {
-          const fullVideo = allVideos.find(function(x) { return (x.filename || x.title) === (v.filename || v.title); });
+          const fullVideo = allVideos.find(x => (x.filename || x.title) === (v.filename || v.title));
           if (fullVideo) openSeries(fullVideo);
         } else {
           playVideo(v.url, v.title, v.category, v.tags);
@@ -1546,20 +1149,16 @@
       }
     });
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(function() {});
-    }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 
     function updateOnlineStatus() {
       const banner = document.getElementById('offlineBanner');
       if (banner) banner.style.display = navigator.onLine ? 'none' : 'block';
     }
-
-    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('online',  updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     updateOnlineStatus();
 
   </script>
-
 </body>
 </html>
