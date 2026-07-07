@@ -296,14 +296,14 @@
     }
 
     function hideStatusBar() {
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.StatusBar) {
-        window.Capacitor.Plugins.StatusBar.hide().catch(function() {});
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SystemBars) {
+        window.Capacitor.Plugins.SystemBars.hide().catch(function() {});
       }
     }
 
     function showStatusBar() {
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.StatusBar) {
-        window.Capacitor.Plugins.StatusBar.show().catch(function() {});
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SystemBars) {
+        window.Capacitor.Plugins.SystemBars.show().catch(function() {});
       }
     }
 
