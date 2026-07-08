@@ -261,6 +261,37 @@
     let isLocked = false;
     const speedOptions = [1, 1.25, 1.5, 2, 0.5];
     let speedIndex = 0;
+
+    function applyNativeInsets() {
+      if (!window.NativeBridge || !window.NativeBridge.getTopInset) return;
+      try {
+        const top = window.NativeBridge.getTopInset();
+        const left = window.NativeBridge.getLeftInset ? window.NativeBridge.getLeftInset() : 0;
+        const right = window.NativeBridge.getRightInset ? window.NativeBridge.getRightInset() : 0;
+        if (top > 0) document.body.style.paddingTop = top + 'px';
+        const wrap = document.getElementById('playerWrap');
+        if (wrap) {
+          wrap.style.paddingLeft = left + 'px';
+          wrap.style.paddingRight = right + 'px';
+        }
+      } catch (e) {}
+    }
+    applyNativeInsets();
+    setTimeout(applyNativeInsets, 300);
+
+    (function() {
+      function applyTopInset() {
+        if (window.NativeBridge && window.NativeBridge.getTopInset) {
+          try {
+            const topInset = window.NativeBridge.getTopInset();
+            if (topInset > 0) document.body.style.paddingTop = topInset + 'px';
+          } catch (e) {}
+        }
+      }
+      applyTopInset();
+      setTimeout(applyTopInset, 300);
+    })();
+
     let currentSeriesAdult = null;
     let currentEpIndexAdult = 0;
 
@@ -320,6 +351,7 @@
         }
         showStatusBar();
         wrap.classList.remove('native-landscape', 'fake-landscape');
+        setTimeout(applyNativeInsets, 400);
         return;
       }
 
@@ -344,6 +376,7 @@
       }
       hideStatusBar();
       wrap.classList.add(locked ? 'native-landscape' : 'fake-landscape');
+      setTimeout(applyNativeInsets, 400);
     }
 
     function cycleSpeed() {
