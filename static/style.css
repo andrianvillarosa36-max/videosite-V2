@@ -339,10 +339,12 @@ button {
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
+  overflow: hidden;
 }
 
 #playerWrap video {
   width: 100%;
+  touch-action: none;
   height: 100%;
   display: block;
   background: #000;

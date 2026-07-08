@@ -401,7 +401,99 @@
       }
     }
 
+    let videoScale = 1;
+    let videoPanX = 0;
+    let videoPanY = 0;
+    let pinchActive = false;
+    let pinchStartDist = 0;
+    let pinchStartScale = 1;
+    let panActive = false;
+    let panStartX = 0, panStartY = 0;
+    let panStartPanX = 0, panStartPanY = 0;
+    let lastTapTime = 0;
+    let suppressNextClick = false;
+
+    function applyVideoTransform() {
+      const v = document.getElementById('videoPlayer');
+      v.style.transform = 'translate(' + videoPanX + 'px, ' + videoPanY + 'px) scale(' + videoScale + ')';
+      v.style.transformOrigin = 'center center';
+    }
+
+    function clampPan() {
+      const wrap = document.getElementById('playerWrap');
+      const maxX = (wrap.clientWidth * (videoScale - 1)) / 2;
+      const maxY = (wrap.clientHeight * (videoScale - 1)) / 2;
+      videoPanX = Math.max(-maxX, Math.min(maxX, videoPanX));
+      videoPanY = Math.max(-maxY, Math.min(maxY, videoPanY));
+    }
+
+    function resetVideoZoom() {
+      videoScale = 1;
+      videoPanX = 0;
+      videoPanY = 0;
+      applyVideoTransform();
+    }
+
+    function touchDist(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function onVideoTouchStart(e) {
+      if (isLocked) return;
+      if (e.touches.length === 2) {
+        pinchActive = true;
+        panActive = false;
+        pinchStartDist = touchDist(e.touches);
+        pinchStartScale = videoScale;
+      } else if (e.touches.length === 1) {
+        const now = Date.now();
+        if (now - lastTapTime < 300) {
+          resetVideoZoom();
+          lastTapTime = 0;
+          suppressNextClick = true;
+          return;
+        }
+        lastTapTime = now;
+        if (videoScale > 1) {
+          panActive = true;
+          panStartX = e.touches[0].clientX;
+          panStartY = e.touches[0].clientY;
+          panStartPanX = videoPanX;
+          panStartPanY = videoPanY;
+        }
+      }
+    }
+
+    function onVideoTouchMove(e) {
+      if (pinchActive && e.touches.length === 2) {
+        e.preventDefault();
+        suppressNextClick = true;
+        const dist = touchDist(e.touches);
+        videoScale = Math.max(1, Math.min(3, pinchStartScale * (dist / pinchStartDist)));
+        clampPan();
+        applyVideoTransform();
+      } else if (panActive && e.touches.length === 1) {
+        e.preventDefault();
+        suppressNextClick = true;
+        videoPanX = panStartPanX + (e.touches[0].clientX - panStartX);
+        videoPanY = panStartPanY + (e.touches[0].clientY - panStartY);
+        clampPan();
+        applyVideoTransform();
+      }
+    }
+
+    function onVideoTouchEnd(e) {
+      if (e.touches.length < 2) pinchActive = false;
+      if (e.touches.length < 1) panActive = false;
+    }
+
     function onPlayerTap(e) {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+      }
       if (isLocked) return;
       const controls = document.getElementById('customControls');
       if (controls.classList.contains('miui-hidden')) {
@@ -442,6 +534,10 @@
       document.getElementById('durTime').textContent = '0:00';
       document.getElementById('miuiSpinner').style.display = 'none';
       document.getElementById('customControls').classList.remove('miui-locked', 'miui-hidden');
+      resetVideoZoom();
+      v.ontouchstart = onVideoTouchStart;
+      v.ontouchmove = onVideoTouchMove;
+      v.ontouchend = onVideoTouchEnd;
 
       v.onplay = function() {
         document.getElementById('centerPlayBtn').textContent = '⏸️';
