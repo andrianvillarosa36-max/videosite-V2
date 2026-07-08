@@ -149,6 +149,7 @@
             <button class="miui-ctrl-btn" id="miuiLockBtn" onclick="toggleLock()">🔓</button>
             <button class="miui-ctrl-btn" id="volIcon" onclick="toggleMute()">🔊</button>
             <button class="miui-ctrl-btn" id="speedBtn" onclick="cycleSpeed()">1.0x</button>
+            <button class="miui-ctrl-btn" id="fitBtn" onclick="cycleFitMode()">Fit</button> 		
             <span style="flex:1;"></span>
             <button class="miui-ctrl-btn" onclick="toggleOrientation()" style="font-size:1.2rem;">⛶</button>
           </div>
@@ -401,6 +402,37 @@
       }
     }
 
+    const fitModes = ['contain', 'cover', 'fill', 'square'];
+    const fitModeLabels = { contain: 'Fit', cover: 'Fill', fill: 'Stretch', square: '1:1' };
+    let fitModeIndex = 0;
+
+    function applyFitMode() {
+      const v = document.getElementById('videoPlayer');
+      const mode = fitModes[fitModeIndex];
+      document.getElementById('fitBtn').textContent = fitModeLabels[mode];
+      if (mode === 'square') {
+        v.style.objectFit = 'cover';
+        v.style.aspectRatio = '1 / 1';
+        v.style.width = 'auto';
+        v.style.height = '100%';
+        v.style.margin = '0 auto';
+        v.style.display = 'block';
+      } else {
+        v.style.objectFit = mode;
+        v.style.aspectRatio = '';
+        v.style.width = '100%';
+        v.style.height = '100%';
+        v.style.margin = '0';
+        v.style.display = 'block';
+      }
+    }
+
+    function cycleFitMode() {
+      fitModeIndex = (fitModeIndex + 1) % fitModes.length;
+      applyFitMode();
+      showControls();
+    }
+
     let videoScale = 1;
     let videoPanX = 0;
     let videoPanY = 0;
@@ -535,6 +567,8 @@
       document.getElementById('miuiSpinner').style.display = 'none';
       document.getElementById('customControls').classList.remove('miui-locked', 'miui-hidden');
       resetVideoZoom();
+      fitModeIndex = 0;
+      applyFitMode();
       v.ontouchstart = onVideoTouchStart;
       v.ontouchmove = onVideoTouchMove;
       v.ontouchend = onVideoTouchEnd;
