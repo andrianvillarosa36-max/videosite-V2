@@ -649,6 +649,7 @@
     function toggleMute() {
       const v = document.getElementById('videoPlayer');
       v.muted = !v.muted;
+      localStorage.setItem('playerMuted', v.muted);
       document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
     }
 
@@ -707,6 +708,7 @@
 
     function cycleSpeed() {
       speedIndex = (speedIndex + 1) % speedOptions.length;
+      localStorage.setItem('playerSpeedIndex', speedIndex);
       const v = document.getElementById('videoPlayer');
       v.playbackRate = speedOptions[speedIndex];
       document.getElementById('speedBtn').textContent = speedOptions[speedIndex] + 'x';
@@ -754,6 +756,7 @@
 
     function cycleFitMode() {
       fitModeIndex = (fitModeIndex + 1) % fitModes.length;
+      localStorage.setItem('playerFitModeIndex', fitModeIndex);
       applyFitMode();
       showControls();
     }
@@ -879,10 +882,13 @@
     function setupCustomPlayer() {
       const v = document.getElementById('videoPlayer');
       isLocked = false;
-      speedIndex = 0;
-      v.playbackRate = 1;
+      speedIndex = parseInt(localStorage.getItem('playerSpeedIndex') || '0', 10);
+      if (!(speedIndex >= 0 && speedIndex < speedOptions.length)) speedIndex = 0;
+      v.playbackRate = speedOptions[speedIndex];
+      v.muted = localStorage.getItem('playerMuted') === 'true';
       document.getElementById('miuiLockBtn').textContent = '🔓';
-      document.getElementById('speedBtn').textContent = '1.0x';
+      document.getElementById('speedBtn').textContent = speedOptions[speedIndex] + 'x';
+      document.getElementById('volIcon').textContent = v.muted ? '🔇' : '🔊';
       document.getElementById('centerPlayBtn').textContent = '▶️';
       document.getElementById('miuiBuffer').style.width = '0%';
       document.getElementById('miuiFill').style.width = '0%';
@@ -892,7 +898,8 @@
       document.getElementById('miuiSpinner').style.display = 'none';
       document.getElementById('customControls').classList.remove('miui-locked', 'miui-hidden');
       resetVideoZoom();
-      fitModeIndex = 0;
+      fitModeIndex = parseInt(localStorage.getItem('playerFitModeIndex') || '0', 10);
+      if (!(fitModeIndex >= 0 && fitModeIndex < fitModes.length)) fitModeIndex = 0;
       applyFitMode();
       v.ontouchstart = onVideoTouchStart;
       v.ontouchmove = onVideoTouchMove;
