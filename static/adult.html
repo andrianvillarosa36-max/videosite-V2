@@ -343,19 +343,6 @@
       if (!isWatching) triggerRefresh();
     });
 
-    (function() {
-      function applyTopInset() {
-        if (window.NativeBridge && window.NativeBridge.getTopInset) {
-          try {
-            const topInset = window.NativeBridge.getTopInset();
-            if (topInset > 0) document.body.style.paddingTop = topInset + 'px';
-          } catch (e) {}
-        }
-      }
-      applyTopInset();
-      setTimeout(applyTopInset, 300);
-    })();
-
     let currentSeriesAdult = null;
     let currentEpIndexAdult = 0;
 
@@ -1171,7 +1158,7 @@
       setCategory('All');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setActiveBnav('bnav-home');
-      loadVideos();
+      triggerRefresh();
     }
 
     function goFavourites() {
