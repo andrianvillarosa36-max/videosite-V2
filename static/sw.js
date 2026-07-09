@@ -1,4 +1,4 @@
-const CACHE_NAME = 'animecorn-v16';
+const CACHE_NAME = 'animecorn-v17';
 const STATIC_ASSETS = [
   '/style.css',
   '/manifest.json',
@@ -80,3 +80,4 @@ self.addEventListener('fetch', function(event) {
 
   // Everything else (other API calls, video streams) - straight to network, no interception
 });
+
