@@ -776,3 +776,24 @@ body {
 #videoPlayer {
   background: #000 !important;
 }
+
+#pullToRefresh {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  margin-left: -17px;
+  border: 3px solid rgba(255,255,255,0.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  background: var(--card);
+  z-index: 500;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+
+#pullToRefresh.spinning {
+  animation: spin 0.7s linear infinite;
+}
