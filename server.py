@@ -281,11 +281,21 @@ def upload_to_catbox(filename, file_path):
 def background_relay_upload(submission_id, vtype, files_meta, thumb_path, thumb_filename):
     """
     Runs in a background thread. Relays already-saved local files to Catbox,
-    then updates the submission row with the final catbox_url/episodes/thumb
-    and flips status to 'pending'. Cleans up local temp files when done.
+    then publishes the video directly to the videos table (no admin approval
+    needed) and flips the submission status to 'approved'. Cleans up local
+    temp files when done.
     """
     db_url = os.environ.get('DATABASE_URL')
     try:
+        conn = psycopg2.connect(db_url)
+        cur = conn.cursor()
+        cur.execute('SELECT title, category FROM submissions WHERE id = %s', (submission_id,))
+        sub_row = cur.fetchone()
+        cur.close()
+        conn.close()
+        title = sub_row[0] if sub_row else ''
+        category = sub_row[1] if sub_row else ''
+
         thumb_url = ''
         if thumb_path:
             try:
@@ -312,7 +322,12 @@ def background_relay_upload(submission_id, vtype, files_meta, thumb_path, thumb_
             conn = psycopg2.connect(db_url)
             cur = conn.cursor()
             cur.execute(
-                "UPDATE submissions SET episodes = %s, thumb = %s, status = 'pending', pending_files = NULL WHERE id = %s",
+                '''INSERT INTO videos (title, filename, thumb, category, type, episodes)
+                   VALUES (%s, %s, %s, %s, 'series', %s)''',
+                (title, title, thumb_url, category, json.dumps(episodes))
+            )
+            cur.execute(
+                "UPDATE submissions SET episodes = %s, thumb = %s, status = 'approved', pending_files = NULL WHERE id = %s",
                 (json.dumps(episodes), thumb_url, submission_id)
             )
             conn.commit()
@@ -332,10 +347,16 @@ def background_relay_upload(submission_id, vtype, files_meta, thumb_path, thumb_
                 cur.close()
                 conn.close()
                 return
+            filename = catbox_url.split('/')[-1]
             conn = psycopg2.connect(db_url)
             cur = conn.cursor()
             cur.execute(
-                "UPDATE submissions SET catbox_url = %s, thumb = %s, status = 'pending', pending_files = NULL WHERE id = %s",
+                '''INSERT INTO videos (title, filename, url, thumb, category, type)
+                   VALUES (%s, %s, %s, %s, %s, %s)''',
+                (title, filename, catbox_url, thumb_url, category, vtype)
+            )
+            cur.execute(
+                "UPDATE submissions SET catbox_url = %s, thumb = %s, status = 'approved', pending_files = NULL WHERE id = %s",
                 (catbox_url, thumb_url, submission_id)
             )
             conn.commit()
@@ -1000,58 +1021,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     (videoUrl, videoUrl)
                 )
             self.send_json({'success': True})
-
-        elif path == '/api/submitsuggestion':
-            session = require_auth(self)
-            if not session: return
-
-            content_type = self.headers.get('Content-Type', '')
-            THUMB_LIMIT = 10 * 1024 * 1024  # 10MB, plenty for an image
-
-            fields = None
-            if 'multipart/form-data' in content_type:
-                try:
-                    fields = parse_multipart_stream(self.rfile, content_type, length, THUMB_LIMIT)
-                except ValueError:
-                    self.send_json({'success': False, 'message': 'Thumbnail exceeds the 10MB limit.'})
-                    return
-                title = fields.get('title', '').strip()
-                description = fields.get('description', '').strip()
-                category = fields.get('category', '')
-                vtype = fields.get('type', 'video')
-                thumb_files = fields.get('_files', [])
-            else:
-                body = json.loads(self.rfile.read(length))
-                title = body.get('title', '').strip()
-                description = body.get('description', '').strip()
-                category = body.get('category', '')
-                vtype = body.get('type', 'video')
-                thumb_files = []
-
-            try:
-                if not title:
-                    self.send_json({'success': False, 'message': 'Title is required.'})
-                    return
-
-                thumb = ''
-                if thumb_files:
-                    try:
-                        thumb = upload_to_catbox(thumb_files[0]['filename'], thumb_files[0]['path'])
-                    except Exception as e:
-                        print(f'Thumbnail upload error: {e}')
-                        self.send_json({'success': False, 'message': 'Thumbnail upload failed. Try again.'})
-                        return
-
-                with db_cursor() as (conn, cur):
-                    cur.execute(
-                        '''INSERT INTO submissions (username, kind, title, description, category, type, thumb, status)
-                           VALUES (%s, 'suggestion', %s, %s, %s, %s, %s, 'pending')''',
-                        (session['username'], title, description, category, vtype, thumb)
-                    )
-                self.send_json({'success': True})
-            finally:
-                if fields:
-                    cleanup_temp_files(fields)
 
         elif path == '/api/uploadchunk':
             session = require_auth(self)

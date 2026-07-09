@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Suggest / Upload — VideoSite</title>
+  <title>Upload — VideoSite</title>
   <link rel="stylesheet" href="/style.css" />
   <style>
     .submit-section {
@@ -22,30 +22,6 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       border-bottom: 1px solid var(--border);
-    }
-
-    .tab-row {
-      display: flex;
-      gap: 8px;
-      padding: 12px 16px;
-    }
-
-    .tab-btn {
-      flex: 1;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      border-radius: 8px;
-      padding: 10px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    .tab-btn.active {
-      background: var(--accent);
-      color: #000;
-      border-color: var(--accent);
     }
 
     .form-body { padding: 0 16px 16px; }
@@ -175,7 +151,7 @@
 
   <!-- NAVBAR -->
   <nav>
-    <div class="logo">📤 Suggest / Upload</div>
+    <div class="logo">📤 Upload</div>
     <div class="nav-right">
       <a href="/index.html" style="color:var(--accent); font-size:0.82rem; text-decoration:none;">❌ Return</a>
     </div>
@@ -184,11 +160,6 @@
   <!-- SUBMIT FORM -->
   <div class="submit-section">
     <div class="submit-title">🎬 Add a Video or Series</div>
-
-    <div class="tab-row">
-      <button class="tab-btn active" id="tabSuggest" onclick="setMode('suggest')">💡 Suggest</button>
-      <button class="tab-btn" id="tabUpload" onclick="setMode('upload')">📁 Upload</button>
-    </div>
 
     <div class="form-body">
       <div class="field">
@@ -236,7 +207,7 @@
 
       <div class="status-msg" id="statusMsg"></div>
 
-      <button class="submit-btn" id="submitBtn" onclick="submitForm()">Submit Suggestion</button>
+      <button class="submit-btn" id="submitBtn" onclick="submitForm()">Submit Upload</button>
     </div>
   </div>
 
@@ -267,23 +238,11 @@
       window.location.href = '/login.html';
     }
 
-    let mode = 'suggest';
-
-    function setMode(m) {
-      mode = m;
-      document.getElementById('tabSuggest').classList.toggle('active', m === 'suggest');
-      document.getElementById('tabUpload').classList.toggle('active', m === 'upload');
-      document.getElementById('submitBtn').textContent = m === 'upload' ? 'Submit Upload' : 'Submit Suggestion';
-      hideStatus();
-      onTypeChange();
-    }
-
     function onTypeChange() {
       const type = document.getElementById('fType').value;
-      const showFiles = mode === 'upload';
-      document.getElementById('fileFieldSingle').style.display = (showFiles && type === 'video') ? 'block' : 'none';
-      document.getElementById('fileFieldSeries').style.display = (showFiles && type === 'series') ? 'block' : 'none';
-      if (showFiles && type === 'series' && document.getElementById('episodeList').children.length === 0) {
+      document.getElementById('fileFieldSingle').style.display = (type === 'video') ? 'block' : 'none';
+      document.getElementById('fileFieldSeries').style.display = (type === 'series') ? 'block' : 'none';
+      if (type === 'series' && document.getElementById('episodeList').children.length === 0) {
         addEpisodeRow();
       }
     }
@@ -335,94 +294,75 @@
 
       try {
         const thumbFile = document.getElementById('fThumb').files[0];
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('category', category);
+        formData.append('type', type);
+        if (thumbFile) formData.append('thumb_file', thumbFile, thumbFile.name);
 
-        if (mode === 'suggest') {
-          const formData = new FormData();
-          formData.append('title', title);
-          formData.append('description', description);
-          formData.append('category', category);
-          formData.append('type', type);
-          if (thumbFile) formData.append('thumb_file', thumbFile, thumbFile.name);
+        document.getElementById('progressBar').style.display = 'block';
 
-          const data = await uploadWithProgress('/api/submitsuggestion', formData, function() {});
-          if (data.success) {
-            showStatus('Suggestion submitted! An admin will review it.', false);
+        try {
+          if (type === 'series') {
+            const fileInputs = document.querySelectorAll('[data-ep-file]');
+            const titleInputs = document.querySelectorAll('[data-ep-title]');
+            const episodeFiles = [];
+
+            for (let i = 0; i < fileInputs.length; i++) {
+              const f = fileInputs[i].files[0];
+              if (!f) continue;
+              if (f.size > 300 * 1024 * 1024) {
+                showStatus(`"${f.name}" exceeds the 300MB limit.`, true);
+                btn.disabled = false;
+                document.getElementById('progressBar').style.display = 'none';
+                return;
+              }
+              episodeFiles.push({ file: f, epTitle: titleInputs[i].value.trim() || ('Episode ' + (i + 1)) });
+            }
+
+            if (!episodeFiles.length) {
+              showStatus('Please add at least one episode file.', true);
+              btn.disabled = false;
+              document.getElementById('progressBar').style.display = 'none';
+              return;
+            }
+
+            const result = await uploadSeriesInChunks(episodeFiles, thumbFile, title, description, category, type, function(pct) {
+              document.getElementById('progressFill').style.width = pct + '%';
+            });
+            showStatus('Files received! Processing in the background, you can leave this page.', false);
             clearForm();
+            await pollUploadStatus(result.submission_id);
             loadMySubmissions();
           } else {
-            showStatus(data.message || 'Something went wrong.', true);
-          }
-        } else {
-          const formData = new FormData();
-          formData.append('title', title);
-          formData.append('description', description);
-          formData.append('category', category);
-          formData.append('type', type);
-          if (thumbFile) formData.append('thumb_file', thumbFile, thumbFile.name);
-
-          document.getElementById('progressBar').style.display = 'block';
-
-          try {
-            if (type === 'series') {
-              const fileInputs = document.querySelectorAll('[data-ep-file]');
-              const titleInputs = document.querySelectorAll('[data-ep-title]');
-              const episodeFiles = [];
-
-              for (let i = 0; i < fileInputs.length; i++) {
-                const f = fileInputs[i].files[0];
-                if (!f) continue;
-                if (f.size > 300 * 1024 * 1024) {
-                  showStatus(`"${f.name}" exceeds the 300MB limit.`, true);
-                  btn.disabled = false;
-                  document.getElementById('progressBar').style.display = 'none';
-                  return;
-                }
-                episodeFiles.push({ file: f, epTitle: titleInputs[i].value.trim() || ('Episode ' + (i + 1)) });
-              }
-
-              if (!episodeFiles.length) {
-                showStatus('Please add at least one episode file.', true);
-                btn.disabled = false;
-                document.getElementById('progressBar').style.display = 'none';
-                return;
-              }
-
-              const result = await uploadSeriesInChunks(episodeFiles, thumbFile, title, description, category, type, function(pct) {
-                document.getElementById('progressFill').style.width = pct + '%';
-              });
-              showStatus('Files received! Processing in the background, you can leave this page.', false);
-              clearForm();
-              await pollUploadStatus(result.submission_id);
-              loadMySubmissions();
-            } else {
-              const file = document.getElementById('fFile').files[0];
-              if (!file) {
-                showStatus('Please choose a video file.', true);
-                btn.disabled = false;
-                document.getElementById('progressBar').style.display = 'none';
-                return;
-              }
-              if (file.size > 300 * 1024 * 1024) {
-                showStatus('File exceeds the 300MB limit.', true);
-                btn.disabled = false;
-                document.getElementById('progressBar').style.display = 'none';
-                return;
-              }
-
-              const result = await uploadSingleVideoInChunks(file, thumbFile, title, description, category, type, function(pct) {
-                document.getElementById('progressFill').style.width = pct + '%';
-              });
-              showStatus('File received! Processing in the background, you can leave this page.', false);
-              clearForm();
-              await pollUploadStatus(result.submission_id);
-              loadMySubmissions();
+            const file = document.getElementById('fFile').files[0];
+            if (!file) {
+              showStatus('Please choose a video file.', true);
+              btn.disabled = false;
+              document.getElementById('progressBar').style.display = 'none';
+              return;
             }
-          } catch (uploadErr) {
-            showStatus(uploadErr.message || 'Upload failed.', true);
-          }
+            if (file.size > 300 * 1024 * 1024) {
+              showStatus('File exceeds the 300MB limit.', true);
+              btn.disabled = false;
+              document.getElementById('progressBar').style.display = 'none';
+              return;
+            }
 
-          document.getElementById('progressBar').style.display = 'none';
+            const result = await uploadSingleVideoInChunks(file, thumbFile, title, description, category, type, function(pct) {
+              document.getElementById('progressFill').style.width = pct + '%';
+            });
+            showStatus('File received! Processing in the background, you can leave this page.', false);
+            clearForm();
+            await pollUploadStatus(result.submission_id);
+            loadMySubmissions();
+          }
+        } catch (uploadErr) {
+          showStatus(uploadErr.message || 'Upload failed.', true);
         }
+
+        document.getElementById('progressBar').style.display = 'none';
       } catch (err) {
         showStatus('Network error. Please try again.', true);
       }
@@ -441,7 +381,7 @@
               if (data.status === 'failed') {
                 showStatus('Background upload failed: ' + (data.admin_note || 'unknown error'), true);
               } else {
-                showStatus('Upload finished processing! Pending admin review.', false);
+                showStatus('Upload finished processing! Your video is now live.', false);
               }
               resolve();
             }
@@ -575,26 +515,6 @@
       }
     }
 
-    function uploadWithProgress(url, formData, onProgress) {
-      return new Promise(function(resolve, reject) {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', url);
-        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-        xhr.upload.onprogress = function(e) {
-          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-        };
-        xhr.onload = function() {
-          try {
-            resolve(JSON.parse(xhr.responseText));
-          } catch (e) {
-            reject(e);
-          }
-        };
-        xhr.onerror = function() { reject(new Error('Network error')); };
-        xhr.send(formData);
-      });
-    }
-
     function clearForm() {
       document.getElementById('fTitle').value = '';
       document.getElementById('fDescription').value = '';
@@ -644,8 +564,9 @@
       return div.innerHTML;
     }
 
+    onTypeChange();
     loadMySubmissions();
   </script>
 
 </body>
-</html>
+</html>	
