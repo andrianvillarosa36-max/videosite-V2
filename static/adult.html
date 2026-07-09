@@ -280,6 +280,13 @@
     applyNativeInsets();
     setTimeout(applyNativeInsets, 300);
 
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState !== 'visible') return;
+      const playerSection = document.getElementById('playerSection');
+      const isWatching = playerSection && playerSection.style.display !== 'none';
+      if (!isWatching) location.reload();
+    });
+
     (function() {
       function applyTopInset() {
         if (window.NativeBridge && window.NativeBridge.getTopInset) {
@@ -1108,6 +1115,7 @@
       setCategory('All');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setActiveBnav('bnav-home');
+      loadVideos();
     }
 
     function goFavourites() {

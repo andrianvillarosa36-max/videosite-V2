@@ -67,7 +67,7 @@
   <!-- SLIDE-OUT "MORE" PANEL -->
   <div id="moreOverlay" class="more-overlay" onclick="closeMorePanel()"></div>
   <div id="morePanel" class="more-panel">
-    <a href="/submit.html" class="more-item">📤 Suggest / Upload</a>
+    <a href="/submit.html" class="more-item">📤 Upload</a>
     <a href="/top.html" class="more-item">🏆 Top Videos</a>
     <a href="/users.html" class="more-item">👥 Users</a>
     <div class="more-item" onclick="toggleGridMenu()">🔲 Grid Size</div>
@@ -290,6 +290,13 @@
     }
     applyNativeInsets();
     setTimeout(applyNativeInsets, 300);
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState !== 'visible') return;
+      const playerSection = document.getElementById('playerSection');
+      const isWatching = playerSection && playerSection.style.display !== 'none';
+      if (!isWatching) location.reload();
+    });
 
     let currentPage  = 1;
     const perPage    = 20;
@@ -1103,7 +1110,7 @@
       if (isAdult) { sessionStorage.setItem('ageVerified', 'true'); window.location.href = '/adult.html'; }
     }
 
-    function goHome() { setCategory('All'); window.scrollTo({ top:0, behavior:'smooth' }); setActiveBnav('bnav-home'); }
+    function goHome() { setCategory('All'); window.scrollTo({ top:0, behavior:'smooth' }); setActiveBnav('bnav-home'); loadVideos(); }
     function goFavourites() { setCategory('Favorites'); window.scrollTo({ top:0, behavior:'smooth' }); setActiveBnav('bnav-fav'); }
     function setActiveBnav(id) {
       document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('active'));
