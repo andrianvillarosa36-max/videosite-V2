@@ -218,9 +218,21 @@
     <div id="continueWatchingRow" style="display:flex; gap:10px; overflow-x:auto; padding:0 14px 8px; scrollbar-width:none;"></div>
   </div>
 
+  <div id="popularSection" style="padding:4px 0;">
+    <div style="padding:0 14px 8px; font-size:0.95rem; font-weight:700; color:#00D4FF;">🔥 Most Popular</div>
+    <div id="mostPopularRow" style="display:flex; gap:10px; overflow-x:auto; padding:0 14px 8px; scrollbar-width:none;"></div>
+    <div style="padding:8px 14px 8px; font-size:0.95rem; font-weight:700; color:#00D4FF;">✨ Newly Added</div>
+    <div id="newlyAddedRow" style="display:flex; gap:10px; overflow-x:auto; padding:0 14px 8px; scrollbar-width:none;"></div>
+  </div>
+
+  <div id="ratedSection" style="padding:4px 0;">
+    <div style="padding:0 14px 8px; font-size:0.95rem; font-weight:700; color:#FFD700;">⭐ Top Rated</div>
+    <div id="topRatedRow" style="display:flex; gap:10px; overflow-x:auto; padding:0 14px 8px; scrollbar-width:none;"></div>
+  </div>
+
   <script>
     if (sessionStorage.getItem('jumpToVideo')) {
-      document.write('<style>#gridSection,#filterBar,#ratedSection,#continueWatchingSection{display:none !important;}</style>');
+      document.write('<style>#gridSection,#filterBar,#ratedSection,#continueWatchingSection,#popularSection{display:none !important;}</style>');
     }
   </script>
 
@@ -400,6 +412,8 @@
       allLikes    = await safeFetchJson('/api/likes', []);
       setSplashProgress(100);
       renderVideos();
+      renderPopularRows();
+      renderRatedRows();
     }
 
     function renderPopularRows() {
@@ -411,17 +425,21 @@
                     + (v.views || 0);
         return { v, score };
       });
-      const mostPopular  = scored.slice().sort((a,b) => b.score - a.score).slice(0, 5);
-      const leastPopular = scored.slice().sort((a,b) => a.score - b.score).slice(0, 5);
+      const mostPopular = scored.slice().sort((a,b) => b.score - a.score).slice(0, 5);
+      const newlyAdded  = allVideos.slice()
+        .sort((a,b) => (b.id || 0) - (a.id || 0))
+        .slice(0, 5)
+        .map(v => ({ v, badge: '🆕 New' }));
 
       function buildPopularCard(item) {
+        const badgeText = item.badge || ('🔥 ' + item.score);
         const thumbStyle = item.v.thumb
           ? 'background-image:url(' + item.v.thumb + '); background-size:cover; background-position:center;' : '';
         const div = document.createElement('div');
         div.style.cssText = 'flex-shrink:0; width:100px; cursor:pointer;';
         div.innerHTML =
           '<div style="width:100px; height:140px; border-radius:8px; background:#1C2333; overflow:hidden; position:relative; ' + thumbStyle + '">' +
-            '<div style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.75); color:#00D4FF; font-size:0.6rem; font-weight:700; padding:2px 5px; border-radius:4px;">🔥 ' + item.score + '</div>' +
+            '<div style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.75); color:#00D4FF; font-size:0.6rem; font-weight:700; padding:2px 5px; border-radius:4px;">' + badgeText + '</div>' +
             '<div style="position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent,rgba(0,0,0,0.9)); padding:16px 5px 5px;">' +
               '<div style="color:#fff; font-size:0.6rem; font-weight:600; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">' + item.v.title + '</div>' +
             '</div>' +
@@ -433,12 +451,12 @@
         return div;
       }
 
-      const mostRow   = document.getElementById('mostPopularRow');
-      const leastRow2 = document.getElementById('leastPopularRow');
-      if (mostRow)   mostRow.innerHTML  = mostPopular.length  ? '' : '<p style="color:#8B949E; font-size:0.78rem;">No data yet.</p>';
-      if (leastRow2) leastRow2.innerHTML = leastPopular.length ? '' : '<p style="color:#8B949E; font-size:0.78rem;">No data yet.</p>';
-      if (mostRow)   mostPopular.forEach(i => mostRow.appendChild(buildPopularCard(i)));
-      if (leastRow2) leastPopular.forEach(i => leastRow2.appendChild(buildPopularCard(i)));
+      const mostRow = document.getElementById('mostPopularRow');
+      const newRow  = document.getElementById('newlyAddedRow');
+      if (mostRow) mostRow.innerHTML = mostPopular.length ? '' : '<p style="color:#8B949E; font-size:0.78rem;">No data yet.</p>';
+      if (newRow)  newRow.innerHTML  = newlyAdded.length  ? '' : '<p style="color:#8B949E; font-size:0.78rem;">No videos yet.</p>';
+      if (mostRow) mostPopular.forEach(i => mostRow.appendChild(buildPopularCard(i)));
+      if (newRow)  newlyAdded.forEach(i => newRow.appendChild(buildPopularCard(i)));
     }
 
     function renderContinueWatching() {
@@ -1288,8 +1306,7 @@
         const avg = videoRatings.reduce((a,b) => a + b.rating, 0) / videoRatings.length;
         return { v, avg };
       });
-      const topRated   = ratedVideos.filter(i => i.avg >= 3).sort((a,b) => b.avg - a.avg).slice(0, 5);
-      const leastRated = ratedVideos.filter(i => i.avg <= 2).sort((a,b) => a.avg - b.avg).slice(0, 5);
+      const topRated = ratedVideos.filter(i => i.avg >= 3).sort((a,b) => b.avg - a.avg).slice(0, 5);
 
       function buildSmallCard(item) {
         const thumbStyle = item.v.thumb ? 'background-image:url(' + item.v.thumb + '); background-size:cover; background-position:center;' : '';
@@ -1306,10 +1323,8 @@
         return div;
       }
 
-      const topRow   = document.getElementById('topRatedRow');
-      const leastRow = document.getElementById('leastRatedRow');
-      if (topRow)   { topRow.innerHTML   = ''; topRated.length   ? topRated.forEach(i => topRow.appendChild(buildSmallCard(i)))     : topRow.innerHTML   = '<p style="color:#8B949E; font-size:0.78rem;">No videos rated 3 stars or above.</p>'; }
-      if (leastRow) { leastRow.innerHTML = ''; leastRated.length ? leastRated.forEach(i => leastRow.appendChild(buildSmallCard(i))) : leastRow.innerHTML = '<p style="color:#8B949E; font-size:0.78rem;">No videos rated below 2 stars.</p>'; }
+      const topRow = document.getElementById('topRatedRow');
+      if (topRow) { topRow.innerHTML = ''; topRated.length ? topRated.forEach(i => topRow.appendChild(buildSmallCard(i))) : topRow.innerHTML = '<p style="color:#8B949E; font-size:0.78rem;">No videos rated 3 stars or above.</p>'; }
     }
 
     function buildCommentRow(c, listElId) {

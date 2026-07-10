@@ -390,6 +390,7 @@ def verify_password(password, salt, stored_hash):
 
 def video_row_to_json(v):
     out = {
+        'id': v['id'],
         'title': v['title'],
         'filename': v['filename'],
         'thumb': v['thumb'],
