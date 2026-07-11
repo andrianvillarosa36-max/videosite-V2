@@ -431,7 +431,7 @@
       setTimeout(applyNativeInsets, 400);
     }
 
- .  function cycleSpeed() {
+    function cycleSpeed() {
       speedIndex = (speedIndex + 1) % speedOptions.length;
       localStorage.setItem('playerSpeedIndex', speedIndex);
       const v = document.getElementById('videoPlayer');
@@ -479,7 +479,7 @@
       }
     }
 
- .  function cycleFitMode() {
+    function cycleFitMode() {
       fitModeIndex = (fitModeIndex + 1) % fitModes.length;
       localStorage.setItem('playerFitModeIndex', fitModeIndex);
       applyFitMode();
