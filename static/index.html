@@ -1401,6 +1401,13 @@
           playVideo(v.url, v.title, v.category, v.tags);
         }
       }
+    }).catch(function(err) {
+      console.error('Failed to load videos:', err);
+      const splash = document.getElementById('splashScreen');
+      if (splash) {
+        splash.innerHTML = '<div style="color:#ff4477; text-align:center; padding:20px; font-size:0.85rem; max-width:280px;">Something went wrong loading the app.<br><br>' +
+          '<button onclick="location.reload()" style="background:var(--accent); color:#000; border:none; border-radius:8px; padding:10px 20px; font-weight:700; cursor:pointer; margin-top:8px;">Retry</button></div>';
+      }
     });
 
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
