@@ -549,12 +549,34 @@
               </div>
               ${s.description ? `<div class="my-sub-desc">${escapeHtml(s.description)}</div>` : ''}
               ${s.admin_note ? `<div class="my-sub-note">Admin note: ${escapeHtml(s.admin_note)}</div>` : ''}
+              <div style="margin-top:6px;">
+                <button onclick="deleteSubmission(${s.id})" style="background:none; border:none; color:#8B949E; font-size:0.7rem; cursor:pointer; padding:0; text-decoration:underline;">Remove from list</button>
+              </div>
             </div>
           `;
         });
         list.innerHTML = html;
       } catch (err) {
         list.innerHTML = '<div class="empty-state">Couldn\'t load your submissions.</div>';
+      }
+    }
+
+    async function deleteSubmission(id) {
+      if (!confirm('Remove this from your submission history? This only clears this entry from the list — if it published a video, the video itself stays live. Delete that separately from the admin panel if you want it gone too.')) return;
+      try {
+        const res = await authFetch('/api/deletesubmission', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: id })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadMySubmissions();
+        } else {
+          alert(data.message || 'Could not remove this entry.');
+        }
+      } catch (e) {
+        alert('Network error. Please try again.');
       }
     }
 

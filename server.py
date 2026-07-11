@@ -1209,6 +1209,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             )
             thread.start()
 
+        elif path == '/api/deletesubmission':
+            session = require_auth(self)
+            if not session: return
+            body = json.loads(self.rfile.read(length))
+            sub_id = body.get('id')
+
+            with db_cursor() as (conn, cur):
+                cur.execute('DELETE FROM submissions WHERE id = %s AND username = %s', (sub_id, session['username']))
+            self.send_json({'success': True})
+
         elif path == '/api/reviewsubmission':
             session = require_admin(self)
             if not session: return
