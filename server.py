@@ -278,14 +278,43 @@ def upload_to_catbox(filename, file_path):
         raise Exception(f'Catbox upload failed: {result}')
     return result
 
-def background_relay_upload(submission_id, vtype, files_meta, thumb_path, thumb_filename):
+def reassemble_chunks(chunk_dir, total_chunks, output_path):
     """
-    Runs in a background thread. Relays already-saved local files to Catbox,
-    then publishes the video directly to the videos table (no admin approval
-    needed) and flips the submission status to 'approved'. Cleans up local
-    temp files when done.
+    Reads numbered chunk files from chunk_dir and concatenates them into
+    output_path, then deletes the chunks and the chunk directory. This is the
+    slow, disk-bound part of an upload — it now only ever runs inside a
+    background thread, never inside a request handler, so a large file can't
+    cause a request to sit open long enough to hit a platform timeout.
+    """
+    with open(output_path, 'wb') as out:
+        for i in range(total_chunks):
+            chunk_path = os.path.join(chunk_dir, f'chunk_{i:06d}')
+            with open(chunk_path, 'rb') as cf:
+                while True:
+                    buf = cf.read(65536)
+                    if not buf:
+                        break
+                    out.write(buf)
+    for i in range(total_chunks):
+        try:
+            os.unlink(os.path.join(chunk_dir, f'chunk_{i:06d}'))
+        except OSError:
+            pass
+    try:
+        os.rmdir(chunk_dir)
+    except OSError:
+        pass
+
+
+def background_relay_upload(submission_id, vtype, files_meta, thumb_chunk_dir, thumb_filename, thumb_total_chunks):
+    """
+    Runs in a background thread. Reassembles each file from its saved chunks,
+    relays it to Catbox, then publishes the video directly to the videos
+    table (no admin approval needed) and flips the submission status to
+    'approved'. Cleans up local temp files when done.
     """
     db_url = os.environ.get('DATABASE_URL')
+    reassembled_paths = []
     try:
         conn = psycopg2.connect(db_url)
         cur = conn.cursor()
@@ -297,17 +326,23 @@ def background_relay_upload(submission_id, vtype, files_meta, thumb_path, thumb_
         category = sub_row[1] if sub_row else ''
 
         thumb_url = ''
-        if thumb_path:
+        if thumb_chunk_dir:
             try:
+                thumb_path = os.path.join(PENDING_UPLOADS_DIR, f'reassembled_thumb_{submission_id}.bin')
+                reassemble_chunks(thumb_chunk_dir, thumb_total_chunks, thumb_path)
+                reassembled_paths.append(thumb_path)
                 thumb_url = upload_to_catbox(thumb_filename, thumb_path)
             except Exception as e:
                 print(f'[background upload {submission_id}] thumbnail relay failed: {e}')
 
         if vtype == 'series':
             episodes = []
-            for item in files_meta:
+            for idx, item in enumerate(files_meta):
                 try:
-                    url = upload_to_catbox(item['filename'], item['path'])
+                    ep_path = os.path.join(PENDING_UPLOADS_DIR, f'reassembled_{submission_id}_{idx}.bin')
+                    reassemble_chunks(item['chunk_dir'], item['total_chunks'], ep_path)
+                    reassembled_paths.append(ep_path)
+                    url = upload_to_catbox(item['filename'], ep_path)
                     episodes.append({'title': item['ep_title'], 'url': url})
                 except Exception as e:
                     print(f'[background upload {submission_id}] episode relay failed: {e}')
@@ -336,7 +371,10 @@ def background_relay_upload(submission_id, vtype, files_meta, thumb_path, thumb_
         else:
             item = files_meta[0]
             try:
-                catbox_url = upload_to_catbox(item['filename'], item['path'])
+                video_path = os.path.join(PENDING_UPLOADS_DIR, f'reassembled_{submission_id}.bin')
+                reassemble_chunks(item['chunk_dir'], item['total_chunks'], video_path)
+                reassembled_paths.append(video_path)
+                catbox_url = upload_to_catbox(item['filename'], video_path)
             except Exception as e:
                 print(f'[background upload {submission_id}] video relay failed: {e}')
                 conn = psycopg2.connect(db_url)
@@ -363,11 +401,7 @@ def background_relay_upload(submission_id, vtype, files_meta, thumb_path, thumb_
             cur.close()
             conn.close()
     finally:
-        # Clean up local files regardless of success/failure
-        all_paths = [f['path'] for f in files_meta]
-        if thumb_path:
-            all_paths.append(thumb_path)
-        for p in all_paths:
+        for p in reassembled_paths:
             try:
                 os.unlink(p)
             except OSError:
@@ -1056,73 +1090,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
             self.send_json({'success': True})
 
-        elif path == '/api/submitupload':
-            session = require_auth(self)
-            if not session: return
-
-            content_type = self.headers.get('Content-Type', '')
-            if 'multipart/form-data' not in content_type:
-                self.send_json({'success': False, 'message': 'Invalid upload format.'})
-                return
-
-            MAX_UPLOAD_SIZE = 500 * 1024 * 1024
-            PER_FILE_LIMIT = 300 * 1024 * 1024
-
-            try:
-                fields = parse_multipart_stream(self.rfile, content_type, length, MAX_UPLOAD_SIZE, max_file_size=PER_FILE_LIMIT)
-            except ValueError:
-                self.send_json({'success': False, 'message': 'Upload exceeds the size limit.'})
-                return
-
-            files = fields.get('_files', [])
-            if not files:
-                self.send_json({'success': False, 'message': 'No file provided.'})
-                cleanup_temp_files(fields)
-                return
-
-            title = fields.get('title', '').strip()
-            description = fields.get('description', '').strip()
-            category = fields.get('category', '')
-            vtype = fields.get('type', 'video')
-
-            if not title:
-                self.send_json({'success': False, 'message': 'Title is required.'})
-                cleanup_temp_files(fields)
-                return
-
-            thumb_uploads = [f for f in files if f['field'] == 'thumb_file']
-            thumb_path = thumb_uploads[0]['path'] if thumb_uploads else None
-            thumb_filename = thumb_uploads[0]['filename'] if thumb_uploads else None
-
-            video_files = [f for f in files if f['field'] != 'thumb_file']
-            if not video_files:
-                self.send_json({'success': False, 'message': 'No video file provided.'})
-                cleanup_temp_files(fields)
-                return
-
-            files_meta = []
-            for i, f in enumerate(video_files):
-                ep_title = fields.get(f"ep_title_{f['field']}", f"Episode {i + 1}")
-                files_meta.append({'filename': f['filename'], 'path': f['path'], 'ep_title': ep_title})
-
-            with db_cursor() as (conn, cur):
-                pending_json = json.dumps([{'path': fm['path'], 'filename': fm['filename']} for fm in files_meta])
-                cur.execute(
-                    '''INSERT INTO submissions (username, kind, title, description, category, type, status, pending_files)
-                       VALUES (%s, 'upload', %s, %s, %s, %s, 'uploading', %s) RETURNING id''',
-                    (session['username'], title, description, category, vtype, pending_json)
-                )
-                submission_id = cur.fetchone()['id']
-
-            self.send_json({'success': True, 'submission_id': submission_id, 'status': 'uploading'})
-
-            thread = threading.Thread(
-                target=background_relay_upload,
-                args=(submission_id, vtype, files_meta, thumb_path, thumb_filename),
-                daemon=True
-            )
-            thread.start()
-
         elif path == '/api/finalizeupload':
             session = require_auth(self)
             if not session: return
@@ -1139,8 +1106,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             ep_title = body.get('ep_title', '')
             thumb_upload_id = body.get('thumb_upload_id', '')
             thumb_filename = body.get('thumb_filename', '')
+            thumb_total_chunks = body.get('thumb_total_chunks', 0)
             is_last_file = body.get('is_last_file', True)
-            existing_submission_id = body.get('submission_id')
             existing_files_meta = body.get('files_meta', [])
 
             if not upload_id or not all(c.isalnum() or c == '-' for c in upload_id):
@@ -1148,42 +1115,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
 
             chunk_dir = os.path.join(PENDING_UPLOADS_DIR, 'chunks_' + upload_id)
-            final_path = os.path.join(PENDING_UPLOADS_DIR, f'reassembled_{upload_id}.bin')
 
-            try:
-                with open(final_path, 'wb') as out:
-                    for i in range(total_chunks):
-                        chunk_path = os.path.join(chunk_dir, f'chunk_{i:06d}')
-                        if not os.path.exists(chunk_path):
-                            raise Exception(f'Chunk {i} of {total_chunks} is missing (upload_id={upload_id}). The upload may have been interrupted.')
-                        with open(chunk_path, 'rb') as cf:
-                            while True:
-                                buf = cf.read(65536)
-                                if not buf:
-                                    break
-                                out.write(buf)
-                for i in range(total_chunks):
-                    try:
-                        os.unlink(os.path.join(chunk_dir, f'chunk_{i:06d}'))
-                    except OSError:
-                        pass
-                try:
-                    os.rmdir(chunk_dir)
-                except OSError:
-                    pass
-            except Exception as e:
-                self.send_json({'success': False, 'message': str(e)})
-                return
+            for i in range(total_chunks):
+                chunk_path = os.path.join(chunk_dir, f'chunk_{i:06d}')
+                if not os.path.exists(chunk_path):
+                    self.send_json({'success': False, 'message': f'Chunk {i} of {total_chunks} is missing (upload_id={upload_id}). The upload may have been interrupted.'})
+                    return
 
-            thumb_path = None
-            if thumb_upload_id:
-                thumb_path = os.path.join(PENDING_UPLOADS_DIR, f'reassembled_{thumb_upload_id}.bin')
-
-            new_file_meta = {'filename': filename, 'path': final_path, 'ep_title': ep_title or filename}
+            new_file_meta = {'filename': filename, 'chunk_dir': chunk_dir, 'total_chunks': total_chunks, 'ep_title': ep_title or filename}
             files_meta = existing_files_meta + [new_file_meta]
 
             if not is_last_file:
-                # More files coming (multi-episode batch) - just acknowledge, client will call finalize again
                 self.send_json({'success': True, 'files_meta': files_meta})
                 return
 
@@ -1191,8 +1133,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({'success': False, 'message': 'Title is required.'})
                 return
 
+            thumb_chunk_dir = ''
+            if thumb_upload_id:
+                thumb_chunk_dir = os.path.join(PENDING_UPLOADS_DIR, 'chunks_' + thumb_upload_id)
+
             with db_cursor() as (conn, cur):
-                pending_json = json.dumps([{'path': fm['path'], 'filename': fm['filename']} for fm in files_meta])
+                pending_json = json.dumps([{'chunk_dir': fm['chunk_dir'], 'filename': fm['filename']} for fm in files_meta])
                 cur.execute(
                     '''INSERT INTO submissions (username, kind, title, description, category, type, status, pending_files)
                        VALUES (%s, 'upload', %s, %s, %s, %s, 'uploading', %s) RETURNING id''',
@@ -1204,7 +1150,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
             thread = threading.Thread(
                 target=background_relay_upload,
-                args=(submission_id, vtype, files_meta, thumb_path, thumb_filename),
+                args=(submission_id, vtype, files_meta, thumb_chunk_dir, thumb_filename, thumb_total_chunks),
                 daemon=True
             )
             thread.start()

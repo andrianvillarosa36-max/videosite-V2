@@ -444,7 +444,7 @@
     }
 
     async function uploadThumbIfPresent(thumbFile) {
-      if (!thumbFile) return { thumbUploadId: '', thumbFilename: '' };
+      if (!thumbFile) return { thumbUploadId: '', thumbFilename: '', thumbTotalChunks: 0 };
       const result = await uploadFileWithChunking(thumbFile, function() {});
       await finalizeOne({
         upload_id: result.uploadId,
@@ -453,11 +453,11 @@
         is_last_file: false,
         files_meta: []
       });
-      return { thumbUploadId: result.uploadId, thumbFilename: thumbFile.name };
+      return { thumbUploadId: result.uploadId, thumbFilename: thumbFile.name, thumbTotalChunks: result.totalChunks };
     }
 
     async function uploadSingleVideoInChunks(videoFile, thumbFile, title, description, category, type, onProgress) {
-      const { thumbUploadId, thumbFilename } = await uploadThumbIfPresent(thumbFile);
+      const { thumbUploadId, thumbFilename, thumbTotalChunks } = await uploadThumbIfPresent(thumbFile);
 
       const videoResult = await uploadFileWithChunking(videoFile, onProgress);
 
@@ -472,6 +472,7 @@
         type: type,
         thumb_upload_id: thumbUploadId,
         thumb_filename: thumbFilename,
+        thumb_total_chunks: thumbTotalChunks,
         is_last_file: true,
         files_meta: []
       });
@@ -479,7 +480,7 @@
     }
 
     async function uploadSeriesInChunks(episodeFiles, thumbFile, title, description, category, type, onProgress) {
-      const { thumbUploadId, thumbFilename } = await uploadThumbIfPresent(thumbFile);
+      const { thumbUploadId, thumbFilename, thumbTotalChunks } = await uploadThumbIfPresent(thumbFile);
 
       let filesMeta = [];
       for (let i = 0; i < episodeFiles.length; i++) {
@@ -507,6 +508,7 @@
           payload.type = type;
           payload.thumb_upload_id = thumbUploadId;
           payload.thumb_filename = thumbFilename;
+          payload.thumb_total_chunks = thumbTotalChunks;
         }
 
         const data = await finalizeOne(payload);
