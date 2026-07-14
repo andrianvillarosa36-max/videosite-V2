@@ -151,9 +151,9 @@
 
   <!-- NAVBAR -->
   <nav>
-    <div class="logo">📤 Upload</div>
+    <div class="logo" id="pageLogo">📤 Upload</div>
     <div class="nav-right">
-      <a href="/index.html" style="color:var(--accent); font-size:0.82rem; text-decoration:none;">❌ Return</a>
+      <a href="/index.html" id="returnLink" style="color:var(--accent); font-size:0.82rem; text-decoration:none;">❌ Return</a>
     </div>
   </nav>
 
@@ -223,6 +223,25 @@
     const user  = JSON.parse(localStorage.getItem('user') || 'null');
     const token = localStorage.getItem('token');
     if (!user) window.location.href = '/login.html';
+
+    const isAdultUpload = new URLSearchParams(window.location.search).get('adult') === '1';
+    if (isAdultUpload) {
+      document.title = '18+ Upload — VideoSite';
+      document.getElementById('pageLogo').textContent = '📤 18+ Upload';
+      document.getElementById('returnLink').href = '/adult.html';
+
+      const adultCats = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
+      const oldCatField = document.getElementById('fCategory');
+      const select = document.createElement('select');
+      select.id = 'fCategory';
+      adultCats.forEach(function(c) {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+      });
+      oldCatField.parentNode.replaceChild(select, oldCatField);
+    }
 
     function authFetch(url, options) {
       options = options || {};

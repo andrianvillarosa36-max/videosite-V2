@@ -119,23 +119,66 @@
       }
 
       list.innerHTML = '';
-      videos.forEach(v => {
+      videos.forEach((v, idx) => {
         const isSerias = v.type === 'series';
+        const vid = v.filename || v.title;
         list.innerHTML += `
           <div class="video-card admin-card" style="margin-bottom:10px;">
             <div class="card-info">
               <p class="video-title">${isSerias ? '📺 ' : '🎬 '}${v.title}</p>
               <p class="video-file">${isSerias ? v.episodes.length + ' episodes' : v.url}</p>
-              <button onclick="deleteVideo('${v.filename || v.title}')"
-                style="margin-top:8px; background:#3a1a1a; color:#ff6666;
-                border:1px solid #ff4444; border-radius:6px; padding:6px 12px;
-                font-size:0.78rem; width:auto; cursor:pointer;">
-                🗑 Delete
-              </button>
+              <p style="color:#8B949E; font-size:0.72rem; margin-top:2px;">Category: ${escapeHtmlAdmin(v.category) || '(none)'}</p>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button onclick="toggleEditVideo(${idx})"
+                  style="background:#1a2a3a; color:#00D4FF;
+                  border:1px solid #00D4FF; border-radius:6px; padding:6px 12px;
+                  font-size:0.78rem; width:auto; cursor:pointer;">
+                  ✏️ Edit
+                </button>
+                <button onclick="deleteVideo('${v.filename || v.title}')"
+                  style="background:#3a1a1a; color:#ff6666;
+                  border:1px solid #ff4444; border-radius:6px; padding:6px 12px;
+                  font-size:0.78rem; width:auto; cursor:pointer;">
+                  🗑 Delete
+                </button>
+              </div>
+              <div id="editForm-${idx}" style="display:none; margin-top:10px; padding:10px; background:#0D1117; border:1px solid #30363D; border-radius:8px;">
+                <input type="text" id="editTitle-${idx}" value="${escapeHtmlAdmin(v.title)}" placeholder="Title"
+                  style="width:100%; background:#161B22; border:1px solid #30363D; border-radius:6px; padding:8px 10px; color:#fff; font-size:0.8rem; margin-bottom:6px; box-sizing:border-box;" />
+                <input type="text" id="editCategory-${idx}" value="${escapeHtmlAdmin(v.category || '')}" placeholder="Category"
+                  style="width:100%; background:#161B22; border:1px solid #30363D; border-radius:6px; padding:8px 10px; color:#fff; font-size:0.8rem; margin-bottom:6px; box-sizing:border-box;" />
+                <div style="font-size:0.68rem; color:#8B949E; margin-bottom:8px;">Adult categories (moves it to the 18+ Corner): Anime corn, NTR Anime corn, Anime series corn, Corn</div>
+                <button onclick="saveEditVideo(${idx}, '${vid}')"
+                  style="background:#103D1E; color:#00FF88; border:1px solid #00FF88; border-radius:6px; padding:6px 12px; font-size:0.78rem; width:auto; cursor:pointer;">
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         `;
       });
+    }
+
+    function toggleEditVideo(idx) {
+      const form = document.getElementById('editForm-' + idx);
+      if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function saveEditVideo(idx, filename) {
+      const title    = document.getElementById('editTitle-' + idx).value.trim();
+      const category = document.getElementById('editCategory-' + idx).value.trim();
+      if (!title) { alert('Title is required.'); return; }
+      const res  = await authFetch('/api/editvideo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: filename, title: title, category: category })
+      });
+      const data = await res.json();
+      if (data.success) {
+        loadVideos();
+      } else {
+        alert(data.message || 'Could not save changes.');
+      }
     }
 
     async function addVideo() {

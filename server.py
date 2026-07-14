@@ -753,6 +753,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     cur.execute('UPDATE videos SET position = %s WHERE filename = %s', (idx, filename))
             self.send_json({'success': True})
 
+        elif path == '/api/editvideo':
+            session = require_admin(self)
+            if not session: return
+            body = json.loads(self.rfile.read(length))
+            filename = body.get('filename', '')
+            title = body.get('title', '').strip()
+            category = body.get('category', '').strip()
+
+            if not filename:
+                self.send_json({'success': False, 'message': 'Missing filename.'})
+                return
+            if not title:
+                self.send_json({'success': False, 'message': 'Title is required.'})
+                return
+
+            with db_cursor() as (conn, cur):
+                cur.execute('UPDATE videos SET title = %s, category = %s WHERE filename = %s', (title, category, filename))
+            self.send_json({'success': True})
+
         elif path == '/api/delete':
             session = require_admin(self)
             if not session: return

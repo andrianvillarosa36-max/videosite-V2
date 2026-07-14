@@ -355,7 +355,7 @@ button {
   top: 0 !important;
   left: 0 !important;
   width: 100vw !important;
-  height: 100vh !important;
+  height: 100dvh !important;
   aspect-ratio: unset !important;
   z-index: 99999 !important;
 }
