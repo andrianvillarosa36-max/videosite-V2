@@ -163,8 +163,9 @@
 
     <div class="form-body">
       <div class="field">
-        <label>Title</label>
-        <input type="text" id="fTitle" placeholder="e.g. My Favorite Movie" />
+        <label>Category</label>
+        <input type="text" id="fCategory" list="categoryList" placeholder="e.g. Action, Comedy, Anime" />
+        <datalist id="categoryList"></datalist>
       </div>
 
       <div class="field">
@@ -241,6 +242,25 @@
         select.appendChild(opt);
       });
       oldCatField.parentNode.replaceChild(select, oldCatField);
+    } else {
+      loadCategorySuggestions();
+    }
+
+    async function loadCategorySuggestions() {
+      try {
+        const res = await fetch('/api/categories');
+        const categories = await res.json();
+        const datalist = document.getElementById('categoryList');
+        if (!datalist) return;
+        datalist.innerHTML = '';
+        categories.forEach(function(c) {
+          const opt = document.createElement('option');
+          opt.value = c;
+          datalist.appendChild(opt);
+        });
+      } catch (e) {
+        // suggestions are a nice-to-have — silently skip if this fails
+      }
     }
 
     function authFetch(url, options) {

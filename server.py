@@ -532,6 +532,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 rows = cur.fetchall()
             self.send_json([video_row_to_json(v) for v in rows])
 
+        elif path == '/api/categories':
+            with db_cursor() as (conn, cur):
+                cur.execute("SELECT DISTINCT category FROM videos WHERE category IS NOT NULL AND category != '' ORDER BY category")
+                rows = cur.fetchall()
+            self.send_json([r['category'] for r in rows])
+
         elif path.startswith('/videos/'):
             filename = path[8:]
             filepath = safe_join(VIDEO_DIR, filename)
