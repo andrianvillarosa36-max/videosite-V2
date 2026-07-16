@@ -172,10 +172,10 @@
         <textarea id="fDescription" placeholder="Tell us about it..."></textarea>
       </div>
 
-      <div class="field">
+      <div class="field" style="position:relative;">
         <label>Category</label>
-        <input type="text" id="fCategory" list="categoryList" placeholder="e.g. Action, Comedy, Anime" />
-        <datalist id="categoryList"></datalist>
+        <input type="text" id="fCategory" autocomplete="off" placeholder="e.g. Action, Comedy, Anime" />
+        <div id="categorySuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--border); border-radius:8px; margin-top:4px; max-height:180px; overflow-y:auto; z-index:50;"></div>
       </div>
 
       <div class="field">
@@ -246,21 +246,52 @@
       loadCategorySuggestions();
     }
 
+    let allCategorySuggestions = [];
+
     async function loadCategorySuggestions() {
       try {
         const res = await fetch('/api/categories');
         const categories = await res.json();
-        const datalist = document.getElementById('categoryList');
-        if (!datalist) return;
-        datalist.innerHTML = '';
-        categories.forEach(function(c) {
-          const opt = document.createElement('option');
-          opt.value = c;
-          datalist.appendChild(opt);
-        });
+        const adultCats = ['Anime corn', 'NTR Anime corn', 'Anime series corn', 'Corn'];
+        allCategorySuggestions = categories.filter(c => !adultCats.includes(c));
+        setupCategoryAutocomplete();
       } catch (e) {
         // suggestions are a nice-to-have — silently skip if this fails
       }
+    }
+
+    function setupCategoryAutocomplete() {
+      const input = document.getElementById('fCategory');
+      const box = document.getElementById('categorySuggestions');
+      if (!input || !box) return;
+
+      function renderSuggestions() {
+        const query = input.value.trim().toLowerCase();
+        const matches = query
+          ? allCategorySuggestions.filter(c => c.toLowerCase().includes(query))
+          : allCategorySuggestions;
+
+        if (!matches.length) { box.style.display = 'none'; return; }
+
+        box.innerHTML = '';
+        matches.forEach(function(c) {
+          const item = document.createElement('div');
+          item.textContent = c;
+          item.style.cssText = 'padding:10px 12px; font-size:0.85rem; color:var(--text); cursor:pointer; border-bottom:1px solid var(--border);';
+          item.addEventListener('click', function() {
+            input.value = c;
+            box.style.display = 'none';
+          });
+          box.appendChild(item);
+        });
+        box.style.display = 'block';
+      }
+
+      input.addEventListener('focus', renderSuggestions);
+      input.addEventListener('input', renderSuggestions);
+      input.addEventListener('blur', function() {
+        setTimeout(function() { box.style.display = 'none'; }, 150);
+      });
     }
 
     function authFetch(url, options) {
