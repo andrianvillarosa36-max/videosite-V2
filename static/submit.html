@@ -265,8 +265,13 @@
       const box = document.getElementById('categorySuggestions');
       if (!input || !box) return;
 
+      function splitCategories(value) {
+        return value.split(',').map(p => p.trim());
+      }
+
       function renderSuggestions() {
-        const query = input.value.trim().toLowerCase();
+        const parts = splitCategories(input.value);
+        const query = parts[parts.length - 1].toLowerCase();
         const matches = query
           ? allCategorySuggestions.filter(c => c.toLowerCase().includes(query))
           : allCategorySuggestions;
@@ -279,8 +284,11 @@
           item.textContent = c;
           item.style.cssText = 'padding:10px 12px; font-size:0.85rem; color:var(--text); cursor:pointer; border-bottom:1px solid var(--border);';
           item.addEventListener('click', function() {
-            input.value = c;
+            const parts = splitCategories(input.value);
+            parts[parts.length - 1] = c;
+            input.value = parts.filter(p => p.length > 0).join(', ');
             box.style.display = 'none';
+            input.focus();
           });
           box.appendChild(item);
         });
