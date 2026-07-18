@@ -38,6 +38,12 @@
     <div style="color:#3CFF3C; font-size:0.85rem; font-weight:700; margin-top:10px; letter-spacing:1px;">LOADING...</div>
   </div>
 
+  <script>
+    if (sessionStorage.getItem('splashShownMain')) {
+      document.getElementById('splashScreen').style.display = 'none';
+    }
+  </script>
+
   <style>
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
@@ -1387,7 +1393,11 @@
     loadVideos().then(function() {
       renderContinueWatching();
       const splash = document.getElementById('splashScreen');
-      if (splash) { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 400); }
+      if (splash) {
+        sessionStorage.setItem('splashShownMain', '1');
+        splash.style.opacity = '0';
+        setTimeout(() => splash.remove(), 400);
+      }
       const catParam = new URLSearchParams(window.location.search).get('cat');
       if (catParam) setCategory(catParam);
       const jump = sessionStorage.getItem('jumpToVideo');
@@ -1405,12 +1415,14 @@
       console.error('Failed to load videos:', err);
       const splash = document.getElementById('splashScreen');
       if (splash) {
+        splash.style.display = 'flex';
+        splash.style.opacity = '1';
         splash.innerHTML = '<div style="color:#ff4477; text-align:center; padding:20px; font-size:0.85rem; max-width:280px;">Something went wrong loading the app.<br><br>' +
           '<button onclick="location.reload()" style="background:var(--accent); color:#000; border:none; border-radius:8px; padding:10px 20px; font-weight:700; cursor:pointer; margin-top:8px;">Retry</button></div>';
       }
     });
 
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if ('serviceWorker' in navigator)
 
     function updateOnlineStatus() {
       const banner = document.getElementById('offlineBanner');

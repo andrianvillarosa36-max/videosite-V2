@@ -85,6 +85,8 @@
       if (data.success) {
         localStorage.setItem('user', JSON.stringify(data));
         localStorage.setItem('token', data.token);
+        sessionStorage.removeItem('splashShownMain');
+        sessionStorage.removeItem('splashShownAdult');
         if (data.role === 'admin') {
           window.location.href = '/admin.html';
         } else {
